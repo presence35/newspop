@@ -1,0 +1,19 @@
+[
+  { "domain": "reuters.com",        "url": "https://feeds.reuters.com/reuters/topNews",                     "geo": "world" },
+  { "domain": "apnews.com",         "url": "https://apnews.com/hub/ap-top-news?output=rss",                 "geo": "world" },
+  { "domain": "bbc.com",            "url": "http://feeds.bbci.co.uk/news/rss.xml",                           "geo": "world" },
+  { "domain": "npr.org",            "url": "https://feeds.npr.org/1001/rss.xml",                             "geo": "us" },
+  { "domain": "wsj.com",            "url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml",                    "geo": "world" },
+  { "domain": "nytimes.com",        "url": "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",       "geo": "us" },
+  { "domain": "washingtonpost.com", "url": "https://feeds.washingtonpost.com/rss/world",                     "geo": "world" },
+  { "domain": "foxnews.com",        "url": "https://moxie.foxnews.com/google-publisher/latest.xml",           "geo": "us" },
+  { "domain": "cnn.com",            "url": "http://rss.cnn.com/rss/cnn_topstories.rss",                       "geo": "us" },
+  { "domain": "theguardian.com",    "url": "https://www.theguardian.com/world/rss",                          "geo": "world" },
+  { "domain": "thehill.com",        "url": "https://thehill.com/feed/",                                      "geo": "us" },
+  { "domain": "axios.com",          "url": "https://api.axios.com/feed/",                                    "geo": "us" },
+  { "domain": "politico.com",       "url": "https://rss.politico.com/politics-news.xml",                     "geo": "us" },
+  { "domain": "nypost.com",         "url": "https://nypost.com/feed/",                                       "geo": "us" },
+  { "domain": "aljazeera.com",      "url": "https://www.aljazeera.com/xml/rss/all.xml",                      "geo": "world" },
+  { "domain": "kyivindependent.com","url": "https://kyivindependent.com/feed/",                               "geo": "ukraine" },
+  { "domain": "pravda.com.ua",      "url": "https://www.pravda.com.ua/eng/rss/view_news/",                    "geo": "ukraine" }
+]

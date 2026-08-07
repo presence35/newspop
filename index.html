@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GroundZero</title>
+<style>
+  :root {
+    --bg: #111214;
+    --panel: #1a1c1f;
+    --border: #2a2d31;
+    --text: #e8e8e8;
+    --muted: #8a8d93;
+    --left: #4a90d9;
+    --center: #999999;
+    --right: #d94a4a;
+    --accent: #e8e8e8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  nav { display: flex; gap: 4px; }
+  nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  nav button.active {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  .story {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .story h2 {
+    font-size: 16px;
+    font-weight: 500;
+    margin: 0 0 10px 0;
+    line-height: 1.4;
+  }
+  .bias-bar {
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+    display: flex;
+    margin-bottom: 8px;
+    background: var(--border);
+  }
+  .bias-bar div { height: 100%; }
+  .bias-bar .l { background: var(--left); }
+  .bias-bar .c { background: var(--center); }
+  .bias-bar .r { background: var(--right); }
+  .meta {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .source-chip {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    color: var(--text);
+  }
+  .source-chip.bias-l { border-left: 3px solid var(--left); }
+  .source-chip.bias-c { border-left: 3px solid var(--center); }
+  .source-chip.bias-r { border-left: 3px solid var(--right); }
+  .blindspot-tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .blindspot-tag.left { background: rgba(74,144,217,0.15); color: var(--left); }
+  .blindspot-tag.right { background: rgba(217,74,74,0.15); color: var(--right); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 20px; }
+  .my-bias-summary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GroundZero</h1>
+  <nav id="tabs">
+    <button data-tab="feed" class="active">Feed</button>
+    <button data-tab="blindspots">Blindspot</button>
+    <button data-tab="mybias">My Bias</button>
+  </nav>
+</header>
+
+<main id="content">
+  <div class="empty">Loading...</div>
+</main>
+
+<script>
+const content = document.getElementById("content");
+const tabs = document.getElementById("tabs");
+let currentTab = "feed";
+
+tabs.addEventListener("click", (e) => {
+  if (e.target.tagName !== "BUTTON") return;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("active"));
+  e.target.classList.add("active");
+  currentTab = e.target.dataset.tab;
+  load();
+});
+
+function biasClass(bias) {
+  if (bias === null) return "c";
+  if (bias <= -1) return "l";
+  if (bias >= 1) return "r";
+  return "c";
+}
+
+function renderStory(story, opts = {}) {
+  const div = document.createElement("div");
+  div.className = "story";
+
+  let blindspotTag = "";
+  if (opts.blindspot) {
+    blindspotTag = `<div class="blindspot-tag ${story.blindspotSide}">Blindspot — ${story.note}</div>`;
+  }
+
+  const barWidth = story.ratedCount || 1;
+  const bar = `
+    <div class="bias-bar">
+      <div class="l" style="width:${(story.left / barWidth) * 100}%"></div>
+      <div class="c" style="width:${(story.center / barWidth) * 100}%"></div>
+      <div class="r" style="width:${(story.right / barWidth) * 100}%"></div>
+    </div>`;
+
+  const chips = story.sources.map(s => `
+    <a href="${s.link}" target="_blank" rel="noopener" class="source-chip bias-${biasClass(s.bias)}"
+       onclick="trackClick(${s.id})">${s.name}</a>
+  `).join("");
+
+  div.innerHTML = `
+    ${blindspotTag}
+    <h2>${escapeHtml(story.headline)}</h2>
+    ${bar}
+    <div class="meta">
+      <span>${story.sourceCount} source${story.sourceCount === 1 ? "" : "s"}</span>
+      ${story.ratedCount ? `<span>${story.leftPct}% left · ${story.centerPct}% center · ${story.rightPct}% right</span>` : ""}
+    </div>
+    <div class="sources">${chips}</div>
+  `;
+  return div;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function trackClick(articleId) {
+  fetch("/api/click", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ articleId })
+  });
+}
+window.trackClick = trackClick;
+
+async function load() {
+  content.innerHTML = `<div class="empty">Loading...</div>`;
+
+  if (currentTab === "feed") {
+    const res = await fetch("/api/feed");
+    const stories = await res.json();
+    content.innerHTML = "";
+    if (stories.length === 0) {
+      content.innerHTML = `<div class="empty">No stories yet. Ingestion may still be running — check back in a minute.</div>`;
+      return;
+    }
+    stories.forEach(s => content.appendChild(renderStory(s)));
+  }
+
+  if (currentTab === "blindspots") {
+    const res = await fetch("/api/blindspots");
+    const stories = await res.json();
+    content.innerHTML = "";
+    if (stories.length === 0) {
+      content.innerHTML = `<div class="empty">No blindspots detected right now.</div>`;
+      return;
+    }
+    stories.forEach(s => content.appendChild(renderStory(s, { blindspot: true })));
+  }
+
+  if (currentTab === "mybias") {
+    const res = await fetch("/api/my-bias");
+    const b = await res.json();
+    content.innerHTML = `
+      <div class="my-bias-summary">
+        <strong style="color:var(--text)">Your reading, ${b.totalClicks} click${b.totalClicks === 1 ? "" : "s"} tracked</strong><br><br>
+        Left: ${b.leftPct}% (${b.left}) &nbsp; Center: ${b.centerPct}% (${b.center}) &nbsp; Right: ${b.rightPct}% (${b.right})
+        ${b.unrated ? `<br>Unrated outlet clicks: ${b.unrated}` : ""}
+      </div>
+    `;
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+
+</body>
+</html>
