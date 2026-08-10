@@ -39,6 +39,27 @@
     "theatlantic.com":    { "name": "The Atlantic",            "bias": -2, "factuality": 7, "owner": "Emerson Collective" },
     "propublica.org":     { "name": "ProPublica",              "bias": -1, "factuality": 8, "owner": "Nonprofit" },
     "pravda.com.ua":      { "name": "Ukrainska Pravda",        "bias": 0,  "factuality": 6, "owner": "Independent (Ukraine)" },
-    "kyivindependent.com":{ "name": "Kyiv Independent",        "bias": -1, "factuality": 7, "owner": "Independent (Ukraine)" }
+    "kyivindependent.com":{ "name": "Kyiv Independent",        "bias": -1, "factuality": 7, "owner": "Independent (Ukraine)" },
+    "france24.com":       { "name": "France 24",               "bias": -1, "factuality": 8, "owner": "France Médias Monde (state-funded)" },
+    "independent.co.uk":  { "name": "The Independent",         "bias": -1, "factuality": 7, "owner": "Independent Digital News & Media" },
+    "dailymail.co.uk":    { "name": "Daily Mail",              "bias": 2,  "factuality": 6, "owner": "Daily Mail and General Trust (DMGT)" },
+    "scmp.com":           { "name": "South China Morning Post","bias": 0,  "factuality": 8, "owner": "Alibaba Group" },
+    "upi.com":            { "name": "UPI",                     "bias": 0,  "factuality": 7, "owner": "News World Communications" },
+    "latimes.com":        { "name": "Los Angeles Times",       "bias": -1, "factuality": 8, "owner": "Dr. Patrick Soon-Shiong" },
+    "skynews.com":        { "name": "Sky News",                "bias": 0,  "factuality": 7, "owner": "Comcast" },
+    "cbc.ca":             { "name": "CBC News",                "bias": -1, "factuality": 8, "owner": "Canadian Broadcasting Corporation" },
+    "theglobeandmail.com":{"name": "The Globe and Mail",        "bias": 0,  "factuality": 8, "owner": "The Woodbridge Company" },
+    "nationalpost.com":   { "name": "National Post",            "bias": 1,  "factuality": 7, "owner": "Postmedia Network" },
+    "dw.com":             { "name": "Deutsche Welle",           "bias": -1, "factuality": 8, "owner": "Deutsche Welle (state-funded)" },
+    "euronews.com":       { "name": "Euronews",                 "bias": 0,  "factuality": 7, "owner": "Media Globe Networks" },
+    "politico.eu":        { "name": "Politico Europe",          "bias": -1, "factuality": 8, "owner": "Axel Springer" },
+    "dailytrust.com":     { "name": "Daily Trust",              "bias": 0,  "factuality": 6, "owner": "Media Trust Ltd (Nigeria)" },
+    "premiumtimesng.com": { "name": "Premium Times",            "bias": 0,  "factuality": 7, "owner": "Premium Times (Nigeria)" },
+    "7news.com.au":       { "name": "7NEWS",                    "bias": 0,  "factuality": 7, "owner": "Seven West Media" },
+    "elpais.com":         { "name": "El País",                  "bias": -1, "factuality": 8, "owner": "PRISA" },
+    "buenosairesherald.com":{ "name": "Buenos Aires Herald",    "bias": 0,  "factuality": 7, "owner": "Independent (Argentina)" },
+    "timesofisrael.com":  { "name": "The Times of Israel",      "bias": 0,  "factuality": 7, "owner": "Times of Israel Ltd" },
+    "tehrantimes.com":    { "name": "Tehran Times",             "bias": 0,  "factuality": 5, "owner": "Islamic Ideology Dissemination Organization" },
+    "middleeasteye.net":  { "name": "Middle East Eye",          "bias": -1, "factuality": 7, "owner": "Middle East Eye" }
   }
 }

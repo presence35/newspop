@@ -1,5 +1,5 @@
 """
-Tiny local embedding sidecar for GroundZero.
+Tiny local embedding sidecar for NewsPop.
 
 Run this only if you set CLUSTER_MODE=embedding. Otherwise app.js uses its
 built-in zero-dependency tfidf clustering and never talks to this port.

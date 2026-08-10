@@ -1,8 +1,8 @@
-// GroundZero — single-file Node server.
+// NewsPop — single-file Node server.
 // RSS ingestion -> embedded JSON store -> cluster articles into stories ->
 // tally bias per story -> serve plain JSON API + static HTML feed.
 //
-// No native dependencies. Data is stored in data/ground.json via store.js —
+// No native dependencies. Data is stored in data/newspop.json via store.js —
 // a tiny in-memory + periodic-flush store, chosen because native SQLite
 // modules (better-sqlite3, node:sqlite) either need a C++ compiler on the
 // host or a Node version this host doesn't have. This app's data volume
@@ -41,6 +41,8 @@ const EMBED_URL = "http://127.0.0.1:5055/embed";
 const CLUSTER_SIM_THRESHOLD = CLUSTER_MODE === "embedding" ? 0.72 : 0.20; // different scales for cosine-on-embeddings vs tfidf overlap
 const BLINDSPOT_MIN_SOURCES = 4; // story needs at least this many outlets to qualify
 const BLINDSPOT_MAX_SHARE = 0.20; // one side must be <=20% of coverage to be a blindspot
+const IMG_MAX_WIDTH = 1280; // cap for CDN image size rewrites (BBC/France24-style token URLs)
+const RETENTION_DAYS = Number(process.env.RETENTION_DAYS) || 7; // drop articles older than this on each ingest
 
 function loadJson(file, fallback) {
   try {
@@ -48,6 +50,11 @@ function loadJson(file, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function bootLog(msg, err) {
+  const detail = err ? ` — ${(err && err.stack) || err}` : "";
+  console.log(`[${new Date().toISOString()}] ${msg}${detail}`);
 }
 
 const biasDb = loadJson(path.join(__dirname, "bias-db.json"), { outlets: {} });
@@ -60,7 +67,7 @@ try {
   store = createStore(DATA_DIR);
 } catch (err) {
   console.error(`cannot use ${DATA_DIR} — falling back to ${os.tmpdir()}`, err);
-  store = createStore(path.join(os.tmpdir(), "groundzero-data"));
+  store = createStore(path.join(os.tmpdir(), "newspop-data"));
 }
 
 // ---------- tiny RSS parser (no deps) ----------
@@ -71,9 +78,52 @@ function parseRss(xml) {
     const title = extractTag(block, "title");
     const link = extractTag(block, "link");
     const pubDate = extractTag(block, "pubDate") || extractTag(block, "dc:date");
-    if (title && link) items.push({ title: decodeEntities(title), link: link.trim(), pubDate });
+    if (title && link) items.push({ title: decodeEntities(title), link: link.trim(), pubDate, image: extractImage(block) });
   }
   return items;
+}
+// Pick the highest-resolution image an RSS item actually exposes, instead of
+// the first tag in the feed (many feeds list small thumbnails first). Collects
+// every media:content / media:thumbnail / image enclosure / <img>, reads its
+// declared width/height where present, and returns the largest candidate.
+// If the winning URL is a known CDN size-token URL (BBC/France24), bump it up
+// to IMG_MAX_WIDTH; otherwise the largest variant offered is all we can get.
+function extractImage(block) {
+  const candidates = [];
+  const tagRe = /<(media:content|media:thumbnail|enclosure|img)\b[^>]*>/gi;
+  let tag;
+  while ((tag = tagRe.exec(block)) !== null) {
+    const t = tag[0];
+    if (/^<enclosure\b/i.test(t) && !/type\s*=\s*["']image\//i.test(t)) continue;
+    const url = t.match(/(?:url|src)\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (!url) continue;
+    // some CDNs emit literal 1x1 placeholder URLs when the real photo is gone
+    if (/placeholder|1x1|1px/i.test(url)) continue;
+    const w = parseInt(t.match(/\bwidth\s*=\s*["']?(\d+)/i)?.[1] || "0", 10) || 0;
+    const h = parseInt(t.match(/\bheight\s*=\s*["']?(\d+)/i)?.[1] || "0", 10) || 0;
+    candidates.push({ url, w, h });
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => b.w * b.h - a.w * a.h || b.w - a.w);
+  return upscaleImage(candidates[0].url);
+}
+
+function upscaleImage(url) {
+  try {
+    if (/bbci\.co\.uk/i.test(url)) {
+      // BBC ichef serves the same image at any width via /standard/<w>/
+      return url.replace(/\/standard\/\d+\//, `/standard/${IMG_MAX_WIDTH}/`);
+    }
+    if (/france24\.com/i.test(url)) {
+      // France24 media CDN takes w:NNN tokens
+      return url.replace(/w:\d+/, `w:${IMG_MAX_WIDTH}`);
+    }
+    // Guardian & friends sign each width variant separately (a rewritten
+    // ?width= returns 401), so the largest variant the feed offered is the cap.
+    return url;
+  } catch {
+    return url;
+  }
 }
 function extractTag(block, tag) {
   const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
@@ -87,6 +137,28 @@ function decodeEntities(s) {
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
+}
+
+// ---------- topic classification (zero-dependency keyword lexicon) ----------
+// Maps headline tokens to a topic. Order matters: first matching topic wins
+// when a headline mentions keywords from several topics. Extend freely.
+const TOPIC_KEYWORDS = {
+  politics: ["election", "vote", "voter", "ballot", "president", "senate", "congress", "senator", "mp ", "mps", "cabinet", "government", "minister", "campaign", "partisan", "parliament", "rival", "coalition", "candidate", "policy", "impeach", "lawsuit", "court", "judge", "rule", "democracy", "referendum"],
+  economy: ["economy", "economic", "market", "markets", "stock", "stocks", "inflation", "fed", "tariff", "tariffs", "trade", "gdp", "bank", "banks", "rate", "rates", "debt", "deficit", "oil price", "gas price", "recession", "growth", "dollar", "pound", "profit", "earnings", "jobless", "jobs", "unemployment", "wage", "wages", "interest"],
+  tech: ["ai", "artificial intelligence", "tech", "technology", "apple", "google", "meta", "microsoft", "openai", "chatgpt", "chip", "chips", "semiconductor", "nvidia", "robot", "software", "startup", "cyber", "cyberattack", "cyber attack", "hack", "hackers", "algorithm", "quantum", "satellite", "spacex", "tiktok", "facebook", "x (formerly", "elon", "electric vehicle", "ev ", "tesla", "data breach"],
+  health: ["health", "hospital", "hospitals", "vaccine", "covid", "virus", "disease", "outbreak", "cancer", "drug", "drugs", "fda", "doctor", "patients", "mental health", "opioid", "pandemic", "medicare", "medicaid", "treatment", "surgeon"],
+  climate: ["climate", "wildfire", "fires", "flood", "flooding", "storm", "hurricane", "drought", "emission", "emissions", "carbon", "greenhouse", "temperature", "heatwave", "tornado", "sea level", "environment", "environmental", "glacier", "energy", "renewable", "solar", "wind power"],
+  science: ["scientist", "scientists", "study", "research", "space", "nasa", "moon", "mars", "discovery", "archaeologist", "archaeology", "fossil", "physicist", "genetic", "dna", "experiment", "james webb", "astronomer"],
+  crime: ["murder", "shooting", "shootings", "police", "arrest", "arrested", "prosecutor", "indict", "indicted", "prison", "sentenced", "trial", "convict", "crime", "fraud", "smuggling", "gang", "kidnap", "hostage", "gunman"],
+  war: ["war", "missile", "invasion", "airstrike", "air strike", "attack", "troops", "troop", "military", "army", "battle", "bombing", "ceasefire", "casualties", "frontline", "shelling", "occupied", "offensive", "counteroffensive", "arsenal", "artillery", "combat"],
+};
+const TOPIC_FALLBACK = "general";
+function classifyTopic(title) {
+  const lower = (title || "").toLowerCase();
+  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
+    if (keywords.some((k) => lower.includes(k))) return topic;
+  }
+  return TOPIC_FALLBACK;
 }
 
 // ---------- embedding + similarity (embedding mode) ----------
@@ -170,17 +242,24 @@ async function ingestAll() {
   console.log(`[ingest] starting, ${feeds.length} feeds`);
   const newArticles = [];
 
+  // retention: drop anything older than RETENTION_DAYS so newspop.json stays small
+  const cutoffIso = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  if (store.pruneBefore(cutoffIso)) console.log(`[ingest] pruned articles older than ${RETENTION_DAYS} days`);
+
   for (const feed of feeds) {
     try {
-      const res = await fetch(feed.url, { signal: AbortSignal.timeout(10000) });
+      const res = await fetch(feed.url, { signal: AbortSignal.timeout(10000), headers: { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" } });
       const xml = await res.text();
       const items = parseRss(xml).slice(0, 20); // cap per feed per run
+      let added = 0;
       for (const item of items) {
         if (store.findArticleByLink(item.link)) continue;
-        newArticles.push({ ...item, domain: feed.domain, geo: feed.geo });
+        newArticles.push({ ...item, domain: feed.domain, geo: feed.geo, topic: classifyTopic(item.title) });
+        added++;
       }
+      bootLog(`[ingest] ${feed.domain}: ${items.length} items, ${added} new`);
     } catch (err) {
-      console.warn(`[ingest] failed for ${feed.domain}: ${err.message}`);
+      bootLog(`[ingest] failed for ${feed.domain}: ${err.message}`);
     }
   }
 
@@ -250,8 +329,10 @@ async function ingestAll() {
       link: art.link,
       published_at: art.pubDate || null,
       geo: art.geo,
+      topic: art.topic,
       cluster_id: clusterId,
       embedding: embeddingToStore,
+      image: art.image || null,
     });
   }
 
@@ -262,6 +343,12 @@ async function ingestAll() {
 // ---------- bias tally per story ----------
 function biasForDomain(domain) {
   return biasDb.outlets[domain] || null;
+}
+function outletLabel(domain) {
+  const known = biasDb.outlets[domain];
+  if (known && known.name) return known.name;
+  const base = domain.replace(/^www\./, "").replace(/\.(com|co\.uk|co|org|net|io|gov|info|ua|uk)$/, "");
+  return base.split(/[-.]/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 }
 function tallyStory(clusterId) {
   const articles = store.articlesByCluster(clusterId);
@@ -275,12 +362,30 @@ function tallyStory(clusterId) {
       else if (info.bias >= 1) right++;
       else center++;
     }
-    return { ...a, bias: info ? info.bias : null, name: info ? info.name : a.domain, factuality: info ? info.factuality : null };
+    return { ...a, image: a.image || null, bias: info ? info.bias : null, name: info ? info.name : outletLabel(a.domain), factuality: info ? info.factuality : null };
   });
+
+  // Dominant topic across the cluster's articles (same rule the filter uses),
+  // so the tag shown on the card always matches what the filters are doing.
+  const topicCount = new Map();
+  for (const a of articles) {
+    const t = a.topic || "general";
+    topicCount.set(t, (topicCount.get(t) || 0) + 1);
+  }
+  let topic = "general", topicN = -1;
+  for (const [t, n] of topicCount) if (n > topicN) { topic = t; topicN = n; }
+
+  const publishedAt = sources
+    .map((s) => s.published_at || s.created_at)
+    .filter(Boolean)
+    .sort()[0] || null;
 
   return {
     clusterId,
+    topic,
     headline: articles[0]?.title || "",
+    image: sources.find((s) => s.image)?.image || null,
+    publishedAt,
     sourceCount: articles.length,
     ratedCount: rated,
     left, center, right,
@@ -291,9 +396,24 @@ function tallyStory(clusterId) {
   };
 }
 
-function getFeed({ geo = null, limit = 50 } = {}) {
-  const clusterIds = store.distinctClusterIds({ geo, limit });
-  return clusterIds.map((id) => tallyStory(id)).filter((s) => s.sourceCount > 0);
+function getFeed({ geos = [], topics = [], hideTopics = [], outlets = [], hideOutlets = [], hours = null, q = null, limit = 50, offset = 0 } = {}) {
+  const pool = store.distinctClusterIds({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, limit: limit * 3, offset });
+  const stories = pool.map((id) => tallyStory(id)).filter((s) => s.sourceCount > 0);
+  // The per-outlet cap prevents a single outlet (e.g. pravda) flooding the
+  // unfiltered feed. When the user explicitly filters by outlet(s), skip it.
+  if (outlets.length > 0) return stories.slice(0, limit);
+  const perOutletCap = Math.max(3, Math.ceil(limit * 0.25));
+  const outletCount = new Map();
+  const picked = [];
+  for (const story of stories) {
+    const domains = new Set(story.sources.map((s) => s.domain));
+    const over = [...domains].some((d) => (outletCount.get(d) || 0) >= perOutletCap);
+    if (over) continue;
+    for (const d of domains) outletCount.set(d, (outletCount.get(d) || 0) + 1);
+    picked.push(story);
+    if (picked.length >= limit) break;
+  }
+  return picked;
 }
 
 function getBlindspots({ limit = 20 } = {}) {
@@ -323,12 +443,44 @@ function getMyBias(visitorId) {
     else center++;
   }
   const total = left + center + right;
+
+  // Daily history, last 7 days (oldest -> newest)
+  const detail = store.clicksByVisitorDetail(visitorId);
+  const dayBuckets = new Map(); // YYYY-MM-DD -> { left, center, right }
+  for (const r of detail) {
+    const info = biasForDomain(r.domain);
+    if (!info) continue;
+    const day = (r.clicked_at || "").slice(0, 10);
+    if (!day) continue;
+    const b = dayBuckets.get(day) || { left: 0, center: 0, right: 0 };
+    if (info.bias <= -1) b.left++;
+    else if (info.bias >= 1) b.right++;
+    else b.center++;
+    dayBuckets.set(day, b);
+  }
+  const history = [];
+  const today = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const key = d.toISOString().slice(0, 10);
+    const b = dayBuckets.get(key) || { left: 0, center: 0, right: 0 };
+    const t = b.left + b.center + b.right;
+    history.push({
+      date: key,
+      left: b.left, center: b.center, right: b.right, total: t,
+      leftPct: t ? Math.round((b.left / t) * 100) : 0,
+      centerPct: t ? Math.round((b.center / t) * 100) : 0,
+      rightPct: t ? Math.round((b.right / t) * 100) : 0,
+    });
+  }
+
   return {
     totalClicks: rows.length,
     left, center, right, unrated,
     leftPct: total ? Math.round((left / total) * 100) : 0,
     centerPct: total ? Math.round((center / total) * 100) : 0,
     rightPct: total ? Math.round((right / total) * 100) : 0,
+    history,
   };
 }
 
@@ -361,6 +513,17 @@ function getOrSetVisitorId(req, res) {
   return id;
 }
 
+function csvParam(url, key) {
+  const v = url.searchParams.get(key);
+  if (!v) return null;
+  return v.split(",").map((s) => s.trim()).filter(Boolean);
+}
+function numParam(url, key, fallback) {
+  const v = url.searchParams.get(key);
+  const n = v ? Number(v) : NaN;
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
 // ---------- HTTP server ----------
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
@@ -374,9 +537,26 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === "/api/feed") {
-      const geo = url.searchParams.get("geo");
-      const feed = getFeed({ geo });
-      json(res, feed);
+      const geos = csvParam(url, "geo") || [];
+      const topics = csvParam(url, "topic") || [];
+      const hideTopics = csvParam(url, "notopic") || [];
+      const outlets = csvParam(url, "outlets") || [];
+      const hideOutlets = csvParam(url, "nooutlet") || [];
+      const hours = url.searchParams.get("hours") ? numParam(url, "hours", null) : null;
+      const q = url.searchParams.get("q") || null;
+      const limit = numParam(url, "limit", 50);
+      const offset = numParam(url, "offset", 0);
+      json(res, getFeed({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, limit, offset }));
+      return;
+    }
+
+    if (url.pathname === "/api/filters") {
+      const opts = store.filterOptions();
+      opts.outlets = opts.outlets.map((o) => ({
+        ...o,
+        label: outletLabel(o.name),
+      }));
+      json(res, opts);
       return;
     }
 
@@ -431,7 +611,7 @@ process.on("unhandledRejection", (err) => console.error("[unhandledRejection]", 
 process.on("uncaughtException", (err) => console.error("[uncaughtException]", err));
 
 server.listen(PORT, () => {
-  console.log(`GroundZero running at http://localhost:${PORT}`);
+  console.log(`NewsPop running at http://localhost:${PORT}`);
   if (CLUSTER_MODE === "embedding") {
     console.log(`CLUSTER_MODE=embedding — make sure embed_server.py is running on port 5055.`);
   } else {

@@ -1,11 +1,11 @@
 [Unit]
-Description=GroundZero news aggregator
+Description=NewsPop news aggregator
 After=network.target
 
 [Service]
 Type=simple
-User=groundzero
-WorkingDirectory=/opt/groundzero
+User=newspop
+WorkingDirectory=/opt/newspop
 Environment=HOST=0.0.0.0
 Environment=PORT=3000
 Environment=CLUSTER_MODE=tfidf

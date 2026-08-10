@@ -1,7 +1,7 @@
-# GroundZero
+# NewsPop
 
 Local-first Ground News clone. No AI API calls, no subscription, no tracking
-beyond your own `data/ground.json` file.
+beyond your own `data/newspop.json` file.
 
 ## What it does
 
@@ -19,27 +19,27 @@ beyond your own `data/ground.json` file.
 ## Deploying on Plesk (shared hosting, e.g. odesaplay.com.ua)
 
 Zero native dependencies — no `npm install` required at all, no compiler
-needed on the host. Data is stored in `data/ground.json` via `store.js`, a
+needed on the host. Data is stored in `data/newspop.json` via `store.js`, a
 small embedded JSON store (see comments in that file for why, and its
 trade-offs vs real SQLite).
 
 Steps:
 1. In Plesk, create a **subdomain** for this app (e.g.
-   `groundzero.yourdomain.com`) rather than a subpath like
-   `yourdomain.com/other_apps/groundzero/`. Plesk's Node.js extension routes
+   `newspop.yourdomain.com`) rather than a subpath like
+   `yourdomain.com/other_apps/newspop/`. Plesk's Node.js extension routes
    one app per domain/subdomain — a subpath under your main domain would get
    routed into your *other* app's process, and its `/api/*` requests would
-   never reach GroundZero (this is what "Unexpected token < in JSON" usually
+   never reach NewsPop (this is what "Unexpected token < in JSON" usually
    means — you're getting the other app's HTML/error page back instead).
 2. Point the subdomain's **Application Root** at this folder.
 3. Set **Application Startup File** to `app.js`.
 4. No `npm install` needed — `app.js` and `store.js` use only Node built-ins.
 5. Restart the app from the Plesk dashboard.
-6. First boot creates `data/ground.json` automatically and kicks off RSS
+6. First boot creates `data/newspop.json` automatically and kicks off RSS
    ingestion — give it 15-30 seconds before checking the feed.
 
 Because it's on its own subdomain, all the frontend's `/api/*` calls are
-relative to GroundZero itself — no path rewriting needed.
+relative to NewsPop itself — no path rewriting needed.
 
 ## Setup
 
@@ -70,7 +70,7 @@ times.
   detection, HTTP API, static file serving. One file (plus `store.js`), no
   npm install needed at all.
 - `store.js` — tiny in-memory + periodic-flush JSON store backed by
-  `data/ground.json`. Deliberately replaces SQLite: native modules need a
+  `data/newspop.json`. Deliberately replaces SQLite: native modules need a
   compiler (g++, python, make) that shared Plesk hosts don't provide. See the
   header comment for trade-offs vs real SQLite.
 - `embed_server.py` — the only "AI" piece, and it's not really AI in the LLM
