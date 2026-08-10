@@ -38,5 +38,22 @@
   { "domain": "buenosairesherald.com","url": "https://buenosairesherald.com/feed/",                                                        "geo": "latam" },
   { "domain": "timesofisrael.com",  "url": "https://www.timesofisrael.com/feed/",                                                          "geo": "meast" },
   { "domain": "tehrantimes.com",    "url": "https://www.tehrantimes.com/rss",                                                              "geo": "meast" },
-  { "domain": "middleeasteye.net",  "url": "https://www.middleeasteye.net/rss",                                                            "geo": "meast" }
+  { "domain": "middleeasteye.net",  "url": "https://www.middleeasteye.net/rss",                                                            "geo": "meast" },
+  { "domain": "apnews.com",         "url": "https://feeds.apnews.com/apnews/topnews",                                                       "geo": "us" },
+  { "domain": "bloomberg.com",      "url": "https://feeds.bloomberg.com/news.rss",                                                          "geo": "us" },
+  { "domain": "ft.com",             "url": "https://www.ft.com/rss/home",                                                                   "geo": "world" },
+  { "domain": "economist.com",      "url": "https://www.economist.com/rss.xml",                                                             "geo": "world" },
+  { "domain": "cbsnews.com",        "url": "https://www.cbsnews.com/latest/rss/main",                                                       "geo": "us" },
+  { "domain": "usatoday.com",       "url": "https://rssfeeds.usatoday.com/usatoday-NewsTopStories",                                         "geo": "us" },
+  { "domain": "theatlantic.com",    "url": "https://www.theatlantic.com/feed/all/",                                                         "geo": "us" },
+  { "domain": "vox.com",            "url": "https://www.vox.com/rss/index.xml",                                                             "geo": "us" },
+  { "domain": "propublica.org",     "url": "https://feeds.propublica.org/propublica/main",                                                  "geo": "us" },
+  { "domain": "huffpost.com",       "url": "https://www.huffpost.com/section/front-page/feed",                                             "geo": "us" },
+  { "domain": "reason.com",         "url": "https://reason.com/feed/",                                                                      "geo": "us" },
+  { "domain": "nationalreview.com", "url": "https://www.nationalreview.com/feed/",                                                          "geo": "us" },
+  { "domain": "motherjones.com",    "url": "https://www.motherjones.com/feed/",                                                             "geo": "us" },
+  { "domain": "dailywire.com",      "url": "https://www.dailywire.com/feeds/rss.xml",                                                       "geo": "us" },
+  { "domain": "breitbart.com",      "url": "https://www.breitbart.com/feed/",                                                               "geo": "us" },
+  { "domain": "msnbc.com",          "url": "https://news.google.com/rss/search?q=site:msnbc.com&hl=en-US&gl=US&ceid=US:en",                "geo": "us" },
+  { "domain": "kyivindependent.com","url": "https://kyivindependent.com/feed/",                                                             "geo": "ukraine" }
 ]

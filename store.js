@@ -22,6 +22,19 @@ import path from "node:path";
 
 const FLUSH_INTERVAL_MS = 5000;
 
+// Single "when did this story actually happen" timestamp for an article.
+// RSS pubDate wins (that's the publication time users see); falls back to
+// created_at (ingestion time) for feeds without a usable pubDate. Used for
+// both the `hours` filter cutoff and feed ordering so what you see matches
+// what's filtered — a wire story ingested today but published 3 days ago no
+// longer passes a 24h filter.
+function articleTs(a) {
+  const pts = a.published_at ? Date.parse(a.published_at) : NaN;
+  const cts = a.created_at ? Date.parse(a.created_at) : NaN;
+  const t = Math.max(pts, cts);
+  return Number.isFinite(t) ? t : 0;
+}
+
 export function createStore(dataDir) {
   fs.mkdirSync(dataDir, { recursive: true });
   const filePath = path.join(dataDir, "newspop.json");
@@ -46,7 +59,7 @@ export function createStore(dataDir) {
     if (!a.created_at) a.created_at = fallbackCreated;
     if (a.geo === undefined) a.geo = null;
     if (a.image === undefined) a.image = null;
-    if (a.topic === undefined) a.topic = "general";
+    if (a.topic === undefined) a.topic = "General";
   }
 
   let dirty = false;
@@ -72,7 +85,7 @@ export function createStore(dataDir) {
       const row = {
         id, domain, title, link,
         published_at: published_at || null,
-        geo, topic: topic || "general",
+        geo, topic: topic || "General",
         cluster_id, embedding: embedding || null,
         image: image || null,
         created_at: new Date().toISOString(),
@@ -84,7 +97,7 @@ export function createStore(dataDir) {
     articlesByCluster(clusterId) {
       return data.articles
         .filter((a) => a.cluster_id === clusterId)
-        .sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+        .sort((a, b) => articleTs(a) - articleTs(b));
     },
     recentClusteredArticles(hoursAgo = 48) {
       const cutoff = Date.now() - hoursAgo * 60 * 60 * 1000;
@@ -93,20 +106,24 @@ export function createStore(dataDir) {
       );
     },
     // Returns distinct cluster ids whose articles match all active filters.
-    // Empty array/`null` for a filter means "no filter". `hours` is a created_at
-    // cutoff. `q` is a case-insensitive headline substring search.
-    distinctClusterIds({ geos = [], topics = [], hideTopics = [], outlets = [], hideOutlets = [], hours = null, q = null, limit = 50, offset = 0 } = {}) {
+    // Empty array/`null` for a filter means "no filter". `hours` is a cutoff
+    // on the article's publication time (published_at, else created_at). `q`
+    // is a case-insensitive headline substring search. `ids` is an optional
+    // explicit cluster-id whitelist (used by the Saved view).
+    distinctClusterIds({ geos = [], topics = [], hideTopics = [], outlets = [], hideOutlets = [], hours = null, q = null, ids = null, limit = 50, offset = 0 } = {}) {
       const cutoff = hours ? Date.now() - hours * 60 * 60 * 1000 : null;
       const geosSet = new Set(geos);
       const topicsSet = new Set(topics);
       const hideTopicsSet = new Set(hideTopics);
       const outletsSet = new Set(outlets);
       const hideOutletsSet = new Set(hideOutlets);
+      const idsSet = new Set((ids || []).map((v) => Number(v)).filter(Number.isFinite));
       const needle = q ? q.toLowerCase() : null;
 
       const pool = data.articles.filter((a) => {
         if (a.cluster_id === null || a.cluster_id === undefined) return false;
-        if (cutoff && new Date(a.created_at).getTime() <= cutoff) return false;
+        if (idsSet.size && !idsSet.has(a.cluster_id)) return false;
+        if (cutoff && articleTs(a) <= cutoff) return false;
         if (geosSet.size && !geosSet.has(a.geo)) return false;
         if (topicsSet.size && !topicsSet.has(a.topic)) return false;
         if (outletsSet.size && !outletsSet.has(a.domain)) return false;
@@ -124,7 +141,7 @@ export function createStore(dataDir) {
       function clusterTopic(articles) {
         const cnt = new Map();
         for (const a of articles) {
-          const t = a.topic || "general";
+          const t = a.topic || "General";
           cnt.set(t, (cnt.get(t) || 0) + 1);
         }
         let best = "general", bestN = -1;
@@ -132,25 +149,26 @@ export function createStore(dataDir) {
         return best;
       }
 
-      const seen = new Map(); // cluster_id -> most recent created_at, for ordering
+      const seen = new Map(); // cluster_id -> most recent publish ts, for ordering
       for (const a of pool) {
+        const ts = articleTs(a);
         const existing = seen.get(a.cluster_id);
-        if (!existing || a.created_at > existing) seen.set(a.cluster_id, a.created_at);
+        if (!existing || ts > existing) seen.set(a.cluster_id, ts);
       }
-      let ids = [...seen.entries()];
+      let entries = [...seen.entries()];
       // Hide filters are cluster-level: a story stays only if none of its outlets
       // are hidden and its dominant topic isn't hidden. Article-level matching
       // alone kept multi-source/mixed-topic clusters that users expect removed.
       if (hideOutletsSet.size || hideTopicsSet.size) {
-        ids = ids.filter(([cid]) => {
+        entries = entries.filter(([cid]) => {
           const all = byCluster.get(cid) || [];
           if (hideOutletsSet.size && all.some((x) => hideOutletsSet.has(x.domain))) return false;
           if (hideTopicsSet.size && hideTopicsSet.has(clusterTopic(all))) return false;
           return true;
         });
       }
-      return ids
-        .sort((a, b) => (b[1] || "").localeCompare(a[1] || ""))
+      return entries
+        .sort((a, b) => (b[1] || 0) - (a[1] || 0))
         .slice(offset, offset + limit)
         .map(([cluster_id]) => cluster_id);
     },

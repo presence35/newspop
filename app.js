@@ -70,6 +70,22 @@ try {
   store = createStore(path.join(os.tmpdir(), "newspop-data"));
 }
 
+// Outlet logos are downloaded once (at setup) into `logos/` and served from
+// here, so readers' browsers never hit a third-party favicon service. Files
+// have no extension, so content type is sniffed from the leading bytes.
+const LOGO_DIR = path.join(__dirname, "logos");
+function contentTypeFor(buf) {
+  if (!buf || buf.length < 4) return "image/x-icon";
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46) return "image/gif";
+  if (buf[0] === 0xff && buf[1] === 0xd8) return "image/jpeg";
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46) return "image/webp";
+  if (buf[0] === 0 && buf[1] === 0 && buf[2] === 1 && buf[3] === 0) return "image/x-icon";
+  const head = buf.slice(0, 512).toString("utf8");
+  if (/^\s*(<\?xml|<svg)/i.test(head)) return "image/svg+xml";
+  return "image/x-icon";
+}
+
 // ---------- tiny RSS parser (no deps) ----------
 function parseRss(xml) {
   const items = [];
@@ -132,6 +148,8 @@ function extractTag(block, tag) {
 }
 function decodeEntities(s) {
   return s
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -238,7 +256,25 @@ function sparseCosineSim(a, b) {
 }
 
 // ---------- ingestion ----------
+// One ingest at a time: boot, the 15-min timer, and manual /api/ingest can
+// all overlap, and running two concurrently would double-fetch feeds and
+// interleave cluster decisions. A second call while one is in flight just
+// logs and returns.
+let ingesting = false;
 async function ingestAll() {
+  if (ingesting) {
+    console.log("[ingest] already running, skipping this tick");
+    return;
+  }
+  ingesting = true;
+  try {
+    await ingestAllInner();
+  } finally {
+    ingesting = false;
+  }
+}
+
+async function ingestAllInner() {
   console.log(`[ingest] starting, ${feeds.length} feeds`);
   const newArticles = [];
 
@@ -375,10 +411,18 @@ function tallyStory(clusterId) {
   let topic = "general", topicN = -1;
   for (const [t, n] of topicCount) if (n > topicN) { topic = t; topicN = n; }
 
-  const publishedAt = sources
-    .map((s) => s.published_at || s.created_at)
-    .filter(Boolean)
-    .sort()[0] || null;
+  // Most recent coverage time across the cluster (max effective publish ts).
+  // The `hours` filter surfaces a cluster when any of its articles is inside
+  // the window, so the card's time must be that same "latest" time — otherwise
+  // a still-active wire story would show an old date while passing a 24h filter.
+  let publishedAt = null, publishedTs = 0;
+  for (const s of sources) {
+    const pts = s.published_at ? Date.parse(s.published_at) : NaN;
+    const cts = s.created_at ? Date.parse(s.created_at) : NaN;
+    const t = Math.max(pts, cts);
+    if (!Number.isFinite(t)) continue;
+    if (t > publishedTs) { publishedTs = t; publishedAt = new Date(t).toISOString(); }
+  }
 
   return {
     clusterId,
@@ -386,6 +430,7 @@ function tallyStory(clusterId) {
     headline: articles[0]?.title || "",
     image: sources.find((s) => s.image)?.image || null,
     publishedAt,
+    publishedTs: Number.isFinite(publishedTs) ? publishedTs : 0,
     sourceCount: articles.length,
     ratedCount: rated,
     left, center, right,
@@ -396,16 +441,31 @@ function tallyStory(clusterId) {
   };
 }
 
-function getFeed({ geos = [], topics = [], hideTopics = [], outlets = [], hideOutlets = [], hours = null, q = null, limit = 50, offset = 0 } = {}) {
-  const pool = store.distinctClusterIds({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, limit: limit * 3, offset });
+function applySort(stories, sort) {
+  if (sort === "coverage") {
+    return [...stories].sort((a, b) => b.sourceCount - a.sourceCount || b.publishedTs - a.publishedTs);
+  }
+  if (sort === "lopsided") {
+    const score = (s) => (Math.max(s.left, s.right) - Math.min(s.left, s.right)) / (s.ratedCount || 1);
+    return [...stories].sort((a, b) => score(b) - score(a) || b.publishedTs - a.publishedTs);
+  }
+  return stories; // "newest" — distinctClusterIds already orders by publish ts desc
+}
+
+function getFeed({ geos = [], topics = [], hideTopics = [], outlets = [], hideOutlets = [], hours = null, q = null, ids = null, sort = "newest", limit = 50, offset = 0, skipCap = false } = {}) {
+  const pool = store.distinctClusterIds({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, ids, limit: limit * 3, offset });
   const stories = pool.map((id) => tallyStory(id)).filter((s) => s.sourceCount > 0);
+  // Sort the whole pool first when the user picked an explicit ordering, so the
+  // cap below can't hide the most-covered/lopsided stories behind newer ones.
+  const ordered = sort === "newest" ? stories : applySort(stories, sort);
   // The per-outlet cap prevents a single outlet (e.g. pravda) flooding the
-  // unfiltered feed. When the user explicitly filters by outlet(s), skip it.
-  if (outlets.length > 0) return stories.slice(0, limit);
+  // unfiltered feed. When the user explicitly filters by outlet(s), asks for
+  // specific story ids (Saved), or needs the whole pool (blindspot scan), skip it.
+  if (outlets.length > 0 || (ids && ids.length) || skipCap) return ordered.slice(0, limit);
   const perOutletCap = Math.max(3, Math.ceil(limit * 0.25));
   const outletCount = new Map();
   const picked = [];
-  for (const story of stories) {
+  for (const story of ordered) {
     const domains = new Set(story.sources.map((s) => s.domain));
     const over = [...domains].some((d) => (outletCount.get(d) || 0) >= perOutletCap);
     if (over) continue;
@@ -417,7 +477,7 @@ function getFeed({ geos = [], topics = [], hideTopics = [], outlets = [], hideOu
 }
 
 function getBlindspots({ limit = 20 } = {}) {
-  const all = getFeed({ limit: 200 });
+  const all = getFeed({ limit: 5000, skipCap: true });
   const blindspots = [];
   for (const story of all) {
     if (story.ratedCount < BLINDSPOT_MIN_SOURCES) continue;
@@ -542,11 +602,34 @@ const server = http.createServer(async (req, res) => {
       const hideTopics = csvParam(url, "notopic") || [];
       const outlets = csvParam(url, "outlets") || [];
       const hideOutlets = csvParam(url, "nooutlet") || [];
+      const ids = csvParam(url, "ids") || null;
       const hours = url.searchParams.get("hours") ? numParam(url, "hours", null) : null;
       const q = url.searchParams.get("q") || null;
+      const sort = url.searchParams.get("sort") || "newest";
       const limit = numParam(url, "limit", 50);
       const offset = numParam(url, "offset", 0);
-      json(res, getFeed({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, limit, offset }));
+      json(res, getFeed({ geos, topics, hideTopics, outlets, hideOutlets, hours, q, ids, sort, limit, offset }));
+      return;
+    }
+
+    if (url.pathname.startsWith("/logo/")) {
+      const domain = decodeURIComponent(url.pathname.slice("/logo/".length));
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(domain)) {
+        res.writeHead(404);
+        res.end("not found");
+        return;
+      }
+      try {
+        const buf = fs.readFileSync(path.join(LOGO_DIR, domain));
+        res.writeHead(200, {
+          "Content-Type": contentTypeFor(buf),
+          "Cache-Control": "public, max-age=86400",
+        });
+        res.end(buf);
+      } catch {
+        res.writeHead(404);
+        res.end("not found");
+      }
       return;
     }
 
@@ -555,8 +638,23 @@ const server = http.createServer(async (req, res) => {
       opts.outlets = opts.outlets.map((o) => ({
         ...o,
         label: outletLabel(o.name),
+        bias: biasForDomain(o.name)?.bias ?? null,
       }));
       json(res, opts);
+      return;
+    }
+
+    if (url.pathname === "/api/sources") {
+      const sources = Object.entries(biasDb.outlets).map(([domain, info]) => ({
+        domain,
+        name: info.name,
+        bias: info.bias,
+        factuality: info.factuality,
+        owner: info.owner,
+        source: info.source || null,
+        geo: feeds.find(f => f.domain === domain)?.geo || null,
+      }));
+      json(res, { sources });
       return;
     }
 

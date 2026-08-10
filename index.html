@@ -39,16 +39,21 @@
   header .brand {
     display: flex;
     align-items: baseline;
+    cursor: pointer;
+    user-select: none;
   }
   header h1 {
     font-size: 18px;
     margin: 0;
     letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--left), var(--center), var(--right));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
   }
   header .tagline {
     margin: 0 0 0 10px;
     font-size: 12px;
-    color: var(--muted);
     font-weight: normal;
     white-space: nowrap;
   }
@@ -91,6 +96,9 @@
   nav button.active {
     color: var(--text);
     border-color: var(--text);
+  }
+  nav button[data-tab="sources"] {
+    margin-left: auto;
   }
   #layout {
     max-width: 980px;
@@ -153,20 +161,6 @@
   }
   .chip-count { font-size: 10px; color: var(--muted); opacity: 0.7; }
   .chip-name { overflow-wrap: anywhere; }
-  #outlet-chips { flex-direction: column; align-items: stretch; }
-  #outlet-chips .chip {
-    justify-content: flex-start;
-    width: 100%;
-    padding: 5px 10px;
-  }
-  .chip .outlet-logo {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    flex-shrink: 0;
-    background: var(--panel);
-  }
-  #outlet-chips .chip-count { margin-left: auto; }
   @media (min-width: 801px) {
     #geo-chips, #topic-chips { flex-direction: column; align-items: stretch; }
     #geo-chips .chip, #topic-chips .chip {
@@ -243,6 +237,42 @@
     padding: 0 8px;
     font-size: 11px;
   }
+  .story-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .story-head h2 { flex: 1; }
+  .unread-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    margin-top: 9px;
+  }
+  .save-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 1px 7px;
+    line-height: 1.5;
+    margin-left: auto;
+  }
+  .save-btn.on { color: #4caf50; border-color: #4caf50; }
+  .unread-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .unread-toggle input { accent-color: var(--accent); }
   .sources {
     display: flex;
     flex-wrap: wrap;
@@ -264,7 +294,6 @@
     height: 14px;
     border-radius: 2px;
     flex-shrink: 0;
-    background: var(--panel);
   }
   .source-chip.bias-l { border-left: 3px solid var(--left); }
   .source-chip.bias-c { border-left: 3px solid var(--center); }
@@ -342,6 +371,52 @@
     #sidebar { width: 100%; position: static; top: auto; height: auto; overflow: visible; padding-right: 0; }
     main { max-width: 100%; }
   }
+
+  /* Sources page */
+  .sources-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+  .sources-header h2 { margin: 0; font-size: 18px; }
+  .sort-controls { display: flex; gap: 6px; }
+  .sort-btn { background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .sort-btn.active { color: var(--text); border-color: var(--text); }
+  .sources-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .source-card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .source-card.disabled { opacity: 0.45; }
+  .source-card-top { display: flex; align-items: center; gap: 10px; }
+  .source-card-logo { width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; }
+  .source-card-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+  .source-card-flag { font-size: 16px; flex-shrink: 0; }
+  .source-card-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+  .source-card-label { color: var(--muted); width: 70px; flex-shrink: 0; }
+  .bias-bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; position: relative; }
+  .bias-bar-fill { height: 100%; border-radius: 3px; position: absolute; top: 0; }
+  .bias-bar-marker { width: 2px; height: 12px; background: var(--text); position: absolute; top: -3px; border-radius: 1px; }
+  .factuality-bar { display: flex; gap: 2px; flex: 1; }
+  .factuality-pip { width: 100%; height: 6px; border-radius: 2px; background: var(--border); }
+  .factuality-pip.filled { background: var(--accent); }
+  .source-card-meta { font-size: 11px; color: var(--muted); line-height: 1.4; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .source-card-meta strong { color: var(--text); font-weight: 500; }
+  .source-badge { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--border); color: var(--muted); margin-top: 2px; }
+  .owner-badge { color: var(--text); font-weight: 600; }
+  .sources-footer { margin-top: 20px; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .sources-footer a { color: var(--accent); text-decoration: none; }
+  .sources-footer a:hover { text-decoration: underline; }
+  .toggle-switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; cursor: pointer; inset: 0; background: var(--border); border-radius: 20px; transition: 0.2s; }
+  .toggle-slider:before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; bottom: 3px; background: var(--muted); border-radius: 50%; transition: 0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--left); }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(16px); background: var(--text); }
+  .sources-bulk { display: flex; gap: 6px; }
+  .sources-bulk button { background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 5px; font-size: 11px; cursor: pointer; }
+  .sources-bulk button:hover { color: var(--text); border-color: var(--text); }
+  .bias-label { font-size: 11px; font-weight: 500; min-width: 60px; }
+  .bias-label.bl { color: var(--left); }
+  .bias-label.bc { color: var(--center); }
+  .bias-label.br { color: var(--right); }
+  @media (max-width: 800px) {
+    .sources-grid { grid-template-columns: 1fr; }
+    .sources-header { flex-direction: column; align-items: flex-start; }
+  }
 </style>
 </head>
 <body>
@@ -355,6 +430,8 @@
     <button data-tab="feed" class="active">Feed</button>
     <button data-tab="blindspots">Blindspot</button>
     <button data-tab="mybias">My Bias</button>
+    <button data-tab="saved">Saved</button>
+    <button data-tab="sources">Sources</button>
   </nav>
 </header>
 
@@ -386,16 +463,21 @@
       </div>
     </section>
     <section>
+      <div class="sec-head"><h3>Sort</h3></div>
+      <div class="chips" id="sort-chips">
+        <button class="chip sort on" data-sort="newest">Newest</button>
+        <button class="chip sort" data-sort="coverage" title="Most outlets covered">Covered</button>
+        <button class="chip sort" data-sort="lopsided" title="Most lopsided coverage">Lopsided</button>
+      </div>
+      <label class="unread-toggle"><input type="checkbox" id="unread-toggle"> Unread only</label>
+    </section>
+    <section>
       <div class="sec-head"><h3>Countries</h3><div class="sec-actions"><button class="reset-btn bulk-btn" data-bulk="geo" data-mode="on" title="Show all countries">All</button><button class="reset-btn bulk-btn" data-bulk="geo" data-mode="none" title="Hide all countries">None</button></div></div>
       <div class="chips" id="geo-chips"></div>
     </section>
     <section>
       <div class="sec-head"><h3>Topics</h3><div class="sec-actions"><button class="reset-btn bulk-btn" data-bulk="topic" data-mode="on" title="Show all topics">All</button><button class="reset-btn bulk-btn" data-bulk="topic" data-mode="none" title="Hide all topics">None</button></div></div>
       <div class="chips" id="topic-chips"></div>
-    </section>
-    <section>
-      <div class="sec-head"><h3>Sources</h3><div class="sec-actions"><button class="reset-btn bulk-btn" data-bulk="outlet" data-mode="on" title="Show all sources">All</button><button class="reset-btn bulk-btn" data-bulk="outlet" data-mode="none" title="Hide all sources">None</button></div></div>
-      <div class="chips" id="outlet-chips"></div>
     </section>
     </div>
   </aside>
@@ -414,20 +496,45 @@ const biasChips = document.getElementById("bias-chips");
 const timeChips = document.getElementById("time-chips");
 let currentTab = "feed";
 
-const filters = { geos: new Set(), biases: new Set(["left", "center", "right"]), hours: null, q: "" };
-const hiddenTopics = new Set(JSON.parse(localStorage.getItem("gz-hidden-topics") || "[]"));
-const hiddenOutlets = new Set(JSON.parse(localStorage.getItem("gz-hidden-outlets") || "[]"));
+const filters = { geos: new Set(), biases: new Set(["left", "center", "right"]), hours: null, q: "", sort: "newest" };
+let hiddenTopics = new Set(JSON.parse(localStorage.getItem("gz-hidden-topics") || "[]"));
+let hiddenOutlets = new Set(JSON.parse(localStorage.getItem("gz-hidden-outlets") || "[]"));
+const READ_KEY = "gz-read";
+const SAVED_KEY = "gz-saved";
+let readSet = new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
+let savedSet = new Set(JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"));
+let unreadOnly = false;
 const PAGE = 50;
 let offset = 0;
 let hasMore = true;
+let storyObserver = null;
+function persistSet(key, set) { localStorage.setItem(key, JSON.stringify([...set])); }
 
 const GEO_FLAGS = { us: "🇺🇸", uk: "🇬🇧", ukraine: "🇺🇦", world: "🌐", canada: "🇨🇦", eu: "🇪🇺", africa: "🦁", australia: "🇦🇺", latam: "🦜", meast: "🕌" };
-const GEO_LABELS = { us: "US", uk: "UK", ukraine: "Ukraine", world: "World", canada: "Canada", eu: "EU", africa: "Africa", australia: "Australia", latam: "LatAm", meast: "Middle East" };
-const TOPIC_EMOJIS = { politics: "🏛️", war: "⚔️", economy: "💰", tech: "💻", health: "🏥", climate: "🌍", science: "🔬", crime: "🚨", general: "📰" };
+const GEO_LABELS = { us: "US", uk: "UK", ukraine: "Ukraine", world: "World", canada: "Canada", eu: "EU", africa: "Africa", australia: "Australia", latam: "Latin America", meast: "Middle East" };
+const TOPIC_EMOJIS = { Politics: "🏛️", War: "⚔️", Economy: "💰", Tech: "💻", Health: "🏥", Climate: "🌍", Science: "🔬", Crime: "🚨", General: "📰" };
 function topicLabel(t) { return (TOPIC_EMOJIS[t] || "") + " " + t; }
 function geoLabel(code) {
   return (GEO_FLAGS[code] || "📍") + " " + (GEO_LABELS[code] || code);
 }
+
+document.querySelector("header .brand").addEventListener("click", () => {
+  filters.geos.clear();
+  filters.biases = new Set(["left", "center", "right"]);
+  filters.hours = null;
+  filters.q = "";
+  filters.sort = "newest";
+  hiddenTopics.clear();
+  localStorage.removeItem("gz-hidden-topics");
+  hiddenOutlets.clear();
+  localStorage.removeItem("gz-hidden-outlets");
+  unreadOnly = false;
+  unreadToggle.checked = false;
+  searchInput.value = "";
+  syncChips();
+  syncSortChips();
+  load({ reset: true });
+});
 
 const collapseBtn = document.getElementById("collapse-sidebar");
 let sidebarCollapsed = localStorage.getItem("gz-sidebar") === "1";
@@ -454,7 +561,9 @@ tabs.addEventListener("click", (e) => {
   document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("active"));
   e.target.classList.add("active");
   currentTab = e.target.dataset.tab;
-  load();
+  document.getElementById("sidebar").style.display = currentTab === "sources" ? "none" : "";
+  load({ reset: true });
+  writeStateToUrl("push");
 });
 
 function biasClass(bias) {
@@ -467,6 +576,7 @@ function biasClass(bias) {
 function renderStory(story, opts = {}) {
   const div = document.createElement("div");
   div.className = "story";
+  div.dataset.story = story.clusterId;
 
   let blindspotTag = "";
   if (opts.blindspot) {
@@ -483,7 +593,7 @@ function renderStory(story, opts = {}) {
 
   const chips = story.sources.map(s => `
     <a href="${s.link}" target="_blank" rel="noopener" class="source-chip bias-${biasClass(s.bias)}"
-       onclick="trackClick(${s.id})"><img class="src-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(s.domain)}&sz=64" alt="" loading="lazy" onerror="this.style.display='none'">${s.name}</a>
+       onclick="trackClick(${s.id}, ${story.clusterId})"><img class="src-logo" src="/logo/${encodeURIComponent(s.domain)}?v=2" alt="" loading="lazy" onerror="this.style.display='none'">${s.name}</a>
   `).join("");
 
   const img = story.image
@@ -491,17 +601,24 @@ function renderStory(story, opts = {}) {
     : "";
 
   const topic = story.topic || (story.sources[0] && story.sources[0].topic);
-  const topicTag = topic && topic !== "general" ? `<span class="topic-tag">${escapeHtml(topicLabel(topic))}</span>` : "";
+  const topicTag = topic && topic !== "General" ? `<span class="topic-tag">${escapeHtml(topicLabel(topic))}</span>` : "";
+
+  const saved = savedSet.has(String(story.clusterId));
+  const unread = !readSet.has(String(story.clusterId));
+  const saveBtn = opts.saved
+    ? `<button class="save-btn on" data-save="${story.clusterId}" title="Remove from saved">🗑️</button>`
+    : `<button class="save-btn ${saved ? "on" : ""}" data-save="${story.clusterId}" title="${saved ? "Remove from saved" : "Save for later"}">${saved ? "✓" : "🔖"}</button>`;
 
   div.innerHTML = `
     ${blindspotTag}
     ${img}
-    <h2>${escapeHtml(story.headline)}</h2>
+    <div class="story-head">${unread ? `<span class="unread-dot" title="Unread"></span>` : ""}<h2>${escapeHtml(story.headline)}</h2></div>
     ${bar}
     <div class="meta">
       ${story.publishedAt ? `<span title="${new Date(story.publishedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}">${timeAgo(story.publishedAt)}</span>` : ""}
       ${topicTag}
       ${story.ratedCount ? `<span>${story.leftPct}% left · ${story.centerPct}% center · ${story.rightPct}% right</span>` : ""}
+      ${saveBtn}
     </div>
     <div class="sources">${chips}</div>
   `;
@@ -526,12 +643,18 @@ function timeAgo(iso) {
   return new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-function trackClick(articleId) {
+function trackClick(articleId, clusterId) {
   fetch("/api/click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ articleId })
   });
+  if (clusterId !== undefined && clusterId !== null && !readSet.has(clusterId)) {
+    readSet.add(clusterId);
+    persistSet(READ_KEY, readSet);
+    const el = document.querySelector(`.story[data-story="${clusterId}"] .unread-dot`);
+    if (el) el.remove();
+  }
 }
 window.trackClick = trackClick;
 
@@ -543,9 +666,31 @@ function feedParams(off) {
   if (hiddenOutlets.size) p.set("nooutlet", [...hiddenOutlets].join(","));
   if (filters.hours) p.set("hours", filters.hours);
   if (filters.q) p.set("q", filters.q);
+  if (filters.sort !== "newest") p.set("sort", filters.sort);
   p.set("limit", PAGE);
   p.set("offset", off);
   return p.toString();
+}
+
+// ---------- URL state (tab only, back button navigates tabs) ----------
+const VALID_TABS = new Set(["feed", "blindspots", "mybias", "saved", "sources"]);
+function readStateFromUrl() {
+  const p = new URLSearchParams(location.search);
+  const tab = p.get("tab");
+  if (tab && VALID_TABS.has(tab)) currentTab = tab;
+  hiddenTopics = new Set(JSON.parse(localStorage.getItem("gz-hidden-topics") || "[]"));
+  hiddenOutlets = new Set(JSON.parse(localStorage.getItem("gz-hidden-outlets") || "[]"));
+}
+
+function stateParams() {
+  const p = new URLSearchParams();
+  if (currentTab !== "feed") p.set("tab", currentTab);
+  return p;
+}
+
+function writeStateToUrl(mode) {
+  const qs = stateParams().toString();
+  history[mode === "replace" ? "replaceState" : "pushState"](null, "", qs ? "?" + qs : location.pathname);
 }
 
 function dominantBias(s) {
@@ -561,6 +706,10 @@ function passesBias(s) {
   return filters.biases.has(d);
 }
 
+function passesUnread(s) {
+  return !unreadOnly || !readSet.has(s.clusterId);
+}
+
 async function fetchFeedPage(off) {
   const res = await fetch("/api/feed?" + feedParams(off));
   return res.json();
@@ -571,17 +720,27 @@ function appendLoadMore() {
   content.appendChild(loadMoreBtn);
 }
 
-async function load() {
+async function load(opts = {}) {
+  if (opts.reset) offset = 0;
   if (currentTab === "feed") return loadFeed();
   if (currentTab === "blindspots") return loadBlindspots();
   if (currentTab === "mybias") return loadMyBias();
+  if (currentTab === "saved") return loadSaved();
+  if (currentTab === "sources") return loadSources();
 }
 
 async function loadFeed() {
   content.innerHTML = `<div class="empty">Loading...</div>`;
-  offset = 0;
-  const raw = await fetchFeedPage(0);
-  const stories = raw.filter(passesBias);
+  if (hiddenOutlets.size > 0) {
+    const srcRes = await fetch("/api/sources");
+    const { sources } = await srcRes.json();
+    if (sources.length > 0 && hiddenOutlets.size >= sources.length) {
+      content.innerHTML = `<div class="empty">All sources are hidden. Go to the <strong>Sources</strong> tab to enable some.</div>`;
+      return;
+    }
+  }
+  const raw = await fetchFeedPage(offset);
+  let stories = raw.filter(passesBias).filter(passesUnread);
   hasMore = raw.length === PAGE;
   content.innerHTML = "";
   if (stories.length === 0) {
@@ -589,6 +748,7 @@ async function loadFeed() {
     return;
   }
   stories.forEach(s => content.appendChild(renderStory(s)));
+  observeStories();
   appendLoadMore();
 }
 
@@ -596,11 +756,12 @@ async function loadMore() {
   offset += PAGE;
   loadMoreBtn.disabled = true;
   const raw = await fetchFeedPage(offset);
-  const stories = raw.filter(passesBias);
+  let stories = raw.filter(passesBias).filter(passesUnread);
   hasMore = raw.length === PAGE;
   loadMoreBtn.remove();
   loadMoreBtn.disabled = false;
   stories.forEach(s => content.appendChild(renderStory(s)));
+  observeStories();
   if (hasMore) appendLoadMore();
 }
 
@@ -613,7 +774,210 @@ async function loadBlindspots() {
     return;
   }
   stories.forEach(s => content.appendChild(renderStory(s, { blindspot: true })));
+  observeStories();
 }
+
+async function loadSaved() {
+  content.innerHTML = `<div class="empty">Loading...</div>`;
+  if (savedSet.size === 0) {
+    content.innerHTML = `<div class="empty">No saved stories. Tap the 🔖 on a story to save it here.</div>`;
+    return;
+  }
+  const res = await fetch("/api/feed?" + new URLSearchParams({ ids: [...savedSet].join(","), limit: PAGE * 4 }));
+  const stories = await res.json();
+  content.innerHTML = "";
+  if (stories.length === 0) {
+    content.innerHTML = `<div class="empty">No saved stories found.</div>`;
+    return;
+  }
+  stories.forEach(s => content.appendChild(renderStory(s, { saved: true })));
+  observeStories();
+}
+
+let sourcesSortMode = "spectrum";
+async function loadSources() {
+  content.innerHTML = `<div class="empty">Loading sources...</div>`;
+  const res = await fetch("/api/sources");
+  const { sources } = await res.json();
+  content.innerHTML = "";
+
+  const header = document.createElement("div");
+  header.className = "sources-header";
+  header.innerHTML = `
+    <h2>All Sources (${sources.length})</h2>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div class="sources-bulk">
+        <button id="sources-enable-all">Enable All</button>
+        <button id="sources-disable-all">Disable All</button>
+      </div>
+      <div class="sort-controls">
+        <button class="sort-btn active" data-sort="spectrum">Spectrum</button>
+        <button class="sort-btn" data-sort="alpha">A-Z</button>
+        <button class="sort-btn" data-sort="factuality">Factuality</button>
+      </div>
+    </div>`;
+  content.appendChild(header);
+
+  header.querySelector("#sources-enable-all").addEventListener("click", () => {
+    hiddenOutlets.clear();
+    persistSet("gz-hidden-outlets", hiddenOutlets);
+    writeStateToUrl("replace");
+    renderSourceCards(sources);
+  });
+  header.querySelector("#sources-disable-all").addEventListener("click", () => {
+    sources.forEach(s => hiddenOutlets.add(s.domain));
+    persistSet("gz-hidden-outlets", hiddenOutlets);
+    writeStateToUrl("replace");
+    renderSourceCards(sources);
+  });
+  header.querySelectorAll(".sort-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      sourcesSortMode = btn.dataset.sort;
+      header.querySelectorAll(".sort-btn").forEach(b => b.classList.toggle("active", b === btn));
+      renderSourceCards(sources);
+    });
+  });
+
+  const grid = document.createElement("div");
+  grid.className = "sources-grid";
+  grid.id = "sources-grid";
+  content.appendChild(grid);
+
+  const footer = document.createElement("div");
+  footer.className = "sources-footer";
+  footer.innerHTML = `
+    Bias &amp; factuality ratings curated from
+    <a href="https://www.allsides.com/media-bias/media-bias-ratings" target="_blank" rel="noopener">AllSides</a>,
+    <a href="https://adfontesmedia.com/" target="_blank" rel="noopener">Ad Fontes Media</a>, and
+    <a href="https://mediabiasfactcheck.com/" target="_blank" rel="noopener">Media Bias/Fact Check</a>.`;
+  content.appendChild(footer);
+
+  renderSourceCards(sources);
+}
+
+function renderSourceCards(sources) {
+  const grid = document.getElementById("sources-grid");
+  if (!grid) return;
+  grid.innerHTML = "";
+
+  let sorted = [...sources];
+  if (sourcesSortMode === "spectrum") {
+    sorted.sort((a, b) => a.bias - b.bias || a.name.localeCompare(b.name));
+  } else if (sourcesSortMode === "alpha") {
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  } else if (sourcesSortMode === "factuality") {
+    sorted.sort((a, b) => b.factuality - a.factuality || a.name.localeCompare(b.name));
+  }
+
+  for (const s of sorted) {
+    const disabled = hiddenOutlets.has(s.domain);
+    const card = document.createElement("div");
+    card.className = "source-card" + (disabled ? " disabled" : "");
+
+    const biasPct = ((s.bias + 3) / 6) * 100;
+    const biasColor = s.bias < 0 ? "var(--left)" : s.bias > 0 ? "var(--right)" : "var(--center)";
+    const biasCls = s.bias < 0 ? "bl" : s.bias > 0 ? "br" : "bc";
+    const biasLabel = s.bias <= -3 ? "Far-left" : s.bias === -2 ? "Left" : s.bias === -1 ? "Lean-left" : s.bias === 0 ? "Center" : s.bias === 1 ? "Lean-right" : s.bias === 2 ? "Right" : "Far-right";
+
+    const geoFlag = GEO_FLAGS[s.geo] || "📍";
+    const geoLbl = GEO_LABELS[s.geo] || s.geo || "Unknown";
+
+    let factualityPips = "";
+    for (let i = 0; i < 10; i++) {
+      factualityPips += `<div class="factuality-pip${i < s.factuality ? " filled" : ""}"></div>`;
+    }
+
+    card.innerHTML = `
+      <div class="source-card-top">
+        <img class="source-card-logo" src="/logo/${encodeURIComponent(s.domain)}" alt="" loading="lazy" onerror="this.style.display='none'">
+        <div class="source-card-name" title="${escapeHtml(s.domain)}">${escapeHtml(s.name)}</div>
+        <span class="source-card-flag" title="${geoLbl}">${geoFlag}</span>
+        <label class="toggle-switch">
+          <input type="checkbox" ${disabled ? "" : "checked"}>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="source-card-row">
+        <span class="source-card-label">Bias</span>
+        <div class="bias-bar-track">
+          <div class="bias-bar-fill" style="left:0;width:${biasPct}%;background:${biasColor};opacity:0.3"></div>
+          <div class="bias-bar-marker" style="left:calc(${biasPct}% - 1px)"></div>
+        </div>
+        <span class="bias-label ${biasCls}">${biasLabel}</span>
+      </div>
+      <div class="source-card-row">
+        <span class="source-card-label">Factual</span>
+        <div class="factuality-bar">${factualityPips}</div>
+        <span style="font-size:11px;color:var(--muted)">${s.factuality}/10</span>
+      </div>
+      <div class="source-card-meta">
+        <span class="source-badge owner-badge" title="Parent company / ownership">${escapeHtml(s.owner || "Unknown")}</span>
+        <span class="source-badge" title="Who rated this outlet's bias & factuality">${escapeHtml(s.source || "Unknown source")}</span>
+      </div>`;
+
+    const toggle = card.querySelector("input[type=checkbox]");
+    toggle.addEventListener("change", () => {
+      if (toggle.checked) hiddenOutlets.delete(s.domain);
+      else hiddenOutlets.add(s.domain);
+      persistSet("gz-hidden-outlets", hiddenOutlets);
+      writeStateToUrl("replace");
+      card.classList.toggle("disabled", !toggle.checked);
+    });
+
+    grid.appendChild(card);
+  }
+}
+
+// Mark a story read the first time it scrolls into view, so the Unread-only
+// filter and the dot badge reflect what you've actually seen.
+function observeStories() {
+  if (!("IntersectionObserver" in window)) return;
+  if (!storyObserver) {
+    storyObserver = new IntersectionObserver((entries) => {
+      let changed = false;
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        const cid = e.target.dataset.story;
+        if (cid && !readSet.has(cid)) { readSet.add(cid); changed = true; }
+        storyObserver.unobserve(e.target);
+      }
+      if (changed) {
+        persistSet(READ_KEY, readSet);
+        document.querySelectorAll("#content .story").forEach((el) => {
+          if (readSet.has(el.dataset.story)) {
+            const dot = el.querySelector(".unread-dot");
+            if (dot) dot.remove();
+          }
+        });
+      }
+    }, { threshold: 0.15 });
+  }
+  content.querySelectorAll(".story").forEach((el) => {
+    if (!readSet.has(el.dataset.story)) storyObserver.observe(el);
+  });
+}
+
+content.addEventListener("click", (e) => {
+  const btn = e.target.closest(".save-btn");
+  if (!btn) return;
+  const cid = btn.dataset.save;
+  if (currentTab === "saved") {
+    savedSet.delete(cid);
+    persistSet(SAVED_KEY, savedSet);
+    const story = btn.closest(".story");
+    if (story) story.remove();
+    if (!content.querySelector(".story")) {
+      content.innerHTML = `<div class="empty">No saved stories. Tap the 🔖 on a story to save it here.</div>`;
+    }
+  } else {
+    if (savedSet.has(cid)) savedSet.delete(cid); else savedSet.add(cid);
+    persistSet(SAVED_KEY, savedSet);
+    const on = savedSet.has(cid);
+    btn.classList.toggle("on", on);
+    btn.title = on ? "Remove from saved" : "Save for later";
+    btn.textContent = on ? "✓" : "🔖";
+  }
+});
 
 async function loadMyBias() {
   const res = await fetch("/api/my-bias");
@@ -647,7 +1011,7 @@ async function loadFilters() {
   const data = await res.json();
   buildChips("geo", data.geos || []);
   buildChips("topic", data.topics || []);
-  buildChips("outlet", data.outlets || []);
+  syncChips();
 }
 
 function buildChips(kind, items) {
@@ -659,16 +1023,11 @@ function buildChips(kind, items) {
     b.className = "chip";
     b.dataset.kind = kind;
     b.dataset.value = item.name;
-    let icon = "";
-    if (kind === "geo") icon = geoLabel(item.name);
-    else if (kind === "topic") icon = topicLabel(item.name);
-    else if (kind === "outlet") {
-      icon = `<img class="outlet-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(item.name)}&sz=64" alt="" loading="lazy" onerror="this.style.display='none'">`;
-    }
-    const label = kind === "outlet" ? (item.label || item.name) : icon;
+    let label = "";
+    if (kind === "geo") label = geoLabel(item.name);
+    else if (kind === "topic") label = topicLabel(item.name);
     b.innerHTML = `<span class="chip-name">${escapeHtml(label)}</span><span class="chip-count">${item.count}</span>`;
     if (kind === "topic") b.classList.toggle("on", !hiddenTopics.has(item.name));
-    if (kind === "outlet") b.classList.toggle("on", !hiddenOutlets.has(item.name));
     el.appendChild(b);
   }
 }
@@ -677,9 +1036,9 @@ function toggleFilter(kind, value) {
   const set = kind === "geo" ? filters.geos : null;
   if (!set) return;
   const active = !set.has(value);
-  if (active) set.add(value); else set.delete(value);
+  if (active) { set.delete("__none__"); set.add(value); } else set.delete(value);
   syncChips();
-  load();
+  load({ reset: true });
 }
 
 function toggleHidden(kind, value) {
@@ -687,13 +1046,13 @@ function toggleHidden(kind, value) {
   if (hidden.has(value)) hidden.delete(value); else hidden.add(value);
   localStorage.setItem("gz-hidden-" + (kind === "topic" ? "topics" : "outlets"), JSON.stringify([...hidden]));
   syncChips();
-  load();
+  load({ reset: true });
 }
 
 sidebar.addEventListener("click", (e) => {
   const chip = e.target.closest(".chip[data-kind]");
   if (!chip) return;
-  if (chip.dataset.kind === "topic" || chip.dataset.kind === "outlet") toggleHidden(chip.dataset.kind, chip.dataset.value);
+  if (chip.dataset.kind === "topic") toggleHidden(chip.dataset.kind, chip.dataset.value);
   else toggleFilter(chip.dataset.kind, chip.dataset.value);
 });
 
@@ -704,7 +1063,7 @@ biasChips.addEventListener("click", (e) => {
   if (filters.biases.has(v)) filters.biases.delete(v); else filters.biases.add(v);
   c.classList.toggle("on", filters.biases.has(v));
   syncResetButtons();
-  load();
+  load({ reset: true });
 });
 
 timeChips.addEventListener("click", (e) => {
@@ -714,7 +1073,22 @@ timeChips.addEventListener("click", (e) => {
   c.classList.add("on");
   filters.hours = c.dataset.hours ? Number(c.dataset.hours) : null;
   syncResetButtons();
-  load();
+  load({ reset: true });
+});
+
+const sortChips = document.getElementById("sort-chips");
+sortChips.addEventListener("click", (e) => {
+  const c = e.target.closest(".chip");
+  if (!c) return;
+  filters.sort = c.dataset.sort;
+  document.querySelectorAll("#sort-chips .chip").forEach(x => x.classList.toggle("on", x.dataset.sort === filters.sort));
+  load({ reset: true });
+});
+
+const unreadToggle = document.getElementById("unread-toggle");
+unreadToggle.addEventListener("change", () => {
+  unreadOnly = unreadToggle.checked;
+  load({ reset: true });
 });
 
 let searchTimer;
@@ -723,7 +1097,7 @@ searchInput.addEventListener("input", () => {
   searchTimer = setTimeout(() => {
     filters.q = searchInput.value.trim().toLowerCase();
     syncResetButtons();
-    load();
+    load({ reset: true });
   }, 400);
 });
 
@@ -731,7 +1105,6 @@ function resetFilters(kind) {
   if (kind === "search") { filters.q = ""; searchInput.value = ""; }
   else if (kind === "geo") filters.geos.clear();
   else if (kind === "topics") { hiddenTopics.clear(); localStorage.removeItem("gz-hidden-topics"); }
-  else if (kind === "outlets") { hiddenOutlets.clear(); localStorage.removeItem("gz-hidden-outlets"); }
   else if (kind === "bias") filters.biases = new Set(["left", "center", "right"]);
   else if (kind === "time") filters.hours = null;
   if (kind === "time") {
@@ -740,12 +1113,11 @@ function resetFilters(kind) {
     syncChips();
   }
   syncResetButtons();
-  load();
+  load({ reset: true });
 }
 const resetMap = {
   "reset-search": "search",
   "reset-topics": "topics",
-  "reset-outlets": "outlets",
   "reset-bias": "bias",
   "reset-time": "time"
 };
@@ -756,14 +1128,13 @@ for (const [id, kind] of Object.entries(resetMap)) {
 
 function syncChips() {
   document.querySelectorAll("#sidebar .chip[data-kind]").forEach(c => {
-    if (c.dataset.kind === "topic" || c.dataset.kind === "outlet") {
-      const hidden = c.dataset.kind === "topic" ? hiddenTopics : hiddenOutlets;
-      c.classList.toggle("on", !hidden.has(c.dataset.value));
-      c.classList.toggle("off", hidden.has(c.dataset.value));
+    if (c.dataset.kind === "topic") {
+      c.classList.toggle("on", !hiddenTopics.has(c.dataset.value));
+      c.classList.toggle("off", hiddenTopics.has(c.dataset.value));
       return;
     }
     const set = c.dataset.kind === "geo" ? filters.geos : null;
-    c.classList.toggle("on", set ? set.has(c.dataset.value) : false);
+    c.classList.toggle("on", set ? (set.size === 0 || set.has(c.dataset.value)) : false);
   });
   document.querySelectorAll("#bias-chips .chip").forEach(c => {
     c.classList.toggle("on", filters.biases.has(c.dataset.bias));
@@ -781,7 +1152,6 @@ function syncResetButtons() {
     "reset-bias": filters.biases.size !== 3,
     "reset-time": filters.hours !== null,
     "reset-topics": hiddenTopics.size > 0,
-    "reset-outlets": hiddenOutlets.size > 0,
   };
   document.querySelectorAll('#sidebar .reset-btn[id^="reset-"]').forEach(btn => {
     btn.classList.toggle("hidden", !dirty[btn.id]);
@@ -796,20 +1166,42 @@ document.querySelectorAll(".bulk-btn").forEach(btn => {
       if (btn.dataset.mode === "on") filters.geos = new Set([...chips].map(c => c.dataset.value));
       else filters.geos = new Set(["__none__"]);
       syncChips();
-      load();
+      load({ reset: true });
       return;
     }
-    const hidden = kind === "topic" ? hiddenTopics : hiddenOutlets;
-    if (btn.dataset.mode === "on") hidden.clear();
-    else chips.forEach(c => hidden.add(c.dataset.value));
-    localStorage.setItem("gz-hidden-" + (kind === "topic" ? "topics" : "outlets"), JSON.stringify([...hidden]));
-    syncChips();
-    load();
+    if (kind === "topic") {
+      if (btn.dataset.mode === "on") hiddenTopics.clear();
+      else chips.forEach(c => hiddenTopics.add(c.dataset.value));
+      localStorage.setItem("gz-hidden-topics", JSON.stringify([...hiddenTopics]));
+      syncChips();
+      load({ reset: true });
+    }
   });
 });
 
-loadFilters();
+window.addEventListener("popstate", () => {
+  readStateFromUrl();
+  unreadToggle.checked = unreadOnly;
+  document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === currentTab));
+  document.getElementById("sidebar").style.display = currentTab === "sources" ? "none" : "";
+  syncChips();
+  syncSortChips();
+  load();
+});
+
+function syncSortChips() {
+  document.querySelectorAll("#sort-chips .chip").forEach(c => {
+    c.classList.toggle("on", c.dataset.sort === filters.sort);
+  });
+}
+
+readStateFromUrl();
+unreadToggle.checked = unreadOnly;
+document.querySelectorAll("#tabs button").forEach(b => b.classList.toggle("active", b.dataset.tab === currentTab));
+document.getElementById("sidebar").style.display = currentTab === "sources" ? "none" : "";
 syncChips();
+syncSortChips();
+loadFilters();
 load();
 </script>
 
