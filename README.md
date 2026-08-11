@@ -82,8 +82,9 @@ times.
   than inventing its own).
 - `feeds.json` — RSS source list with geo tags. Add outlets here + a matching
   entry in `bias-db.json` to expand coverage.
-- `index.html` — the entire frontend. No framework, no build step,
-  no JS bundler. Three tabs: Feed, Blindspot, My Bias.
+- `index.html` — frontend markup. No framework, no build step, no JS bundler.
+- `styles.css` — frontend styles.
+- `frontend.js` — frontend logic. Tabs: Feed, Blindspot, My Bias, Saved, Sources.
 
 ## Known gaps vs. Ground News (intentionally out of v1 scope)
 

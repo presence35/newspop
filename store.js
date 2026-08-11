@@ -55,11 +55,13 @@ export function createStore(dataDir) {
 
   // Backfill fields older data files may lack, so sorting/tallying never hits nulls.
   const fallbackCreated = new Date().toISOString();
+  const TOPIC_CASES = { politics: "Politics", war: "War", economy: "Economy", tech: "Tech", health: "Health", climate: "Climate", science: "Science", crime: "Crime", general: "General" };
   for (const a of data.articles) {
     if (!a.created_at) a.created_at = fallbackCreated;
     if (a.geo === undefined) a.geo = null;
     if (a.image === undefined) a.image = null;
     if (a.topic === undefined) a.topic = "General";
+    else if (TOPIC_CASES[a.topic]) a.topic = TOPIC_CASES[a.topic];
   }
 
   let dirty = false;
@@ -144,7 +146,7 @@ export function createStore(dataDir) {
           const t = a.topic || "General";
           cnt.set(t, (cnt.get(t) || 0) + 1);
         }
-        let best = "general", bestN = -1;
+        let best = "General", bestN = -1;
         for (const [t, n] of cnt) if (n > bestN) { best = t; bestN = n; }
         return best;
       }
@@ -187,6 +189,28 @@ export function createStore(dataDir) {
         topics: byCount([...topics.entries()].map(([name, count]) => ({ name, count }))),
         outlets: byCount([...outlets.entries()].map(([name, count]) => ({ name, count }))),
       };
+    },
+
+    // Full-store access for on-boot re-clustering (see reclusterAll in app.js).
+    allArticles() {
+      return data.articles;
+    },
+    setArticleCluster(articleId, clusterId) {
+      const a = data.articles.find((x) => x.id === articleId);
+      if (!a) return false;
+      a.cluster_id = clusterId;
+      markDirty();
+      return true;
+    },
+    nextClusterId() {
+      return data.nextId.cluster++;
+    },
+    replaceClusters(clusters) {
+      data.clusters = clusters;
+      let max = 0;
+      for (const c of clusters) if (c.id > max) max = c.id;
+      data.nextId.cluster = max + 1;
+      markDirty();
     },
 
     // ---- clusters ----
@@ -235,6 +259,14 @@ export function createStore(dataDir) {
       data.clusters = data.clusters.filter((c) => live.has(c.id));
       markDirty();
       return true;
+    },
+
+    // Simple persisted flags (e.g. one-time data migrations).
+    getFlag(key) {
+      return !!data[key];
+    },
+    setFlag(key, value) {
+      if (data[key] !== value) { data[key] = value; markDirty(); }
     },
 
     flush, // exposed for explicit calls (e.g. after ingestion batch)

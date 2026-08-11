@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || "127.0.0.1"; // set to 0.0.0.0 to accept non-local connections
 const CLUSTER_MODE = process.env.CLUSTER_MODE || "tfidf"; // "tfidf" | "embedding"
 const EMBED_URL = "http://127.0.0.1:5055/embed";
-const CLUSTER_SIM_THRESHOLD = CLUSTER_MODE === "embedding" ? 0.72 : 0.20; // different scales for cosine-on-embeddings vs tfidf overlap
+const CLUSTER_SIM_THRESHOLD = CLUSTER_MODE === "embedding" ? 0.72 : 0.28; // different scales for cosine-on-embeddings vs tfidf overlap
 const BLINDSPOT_MIN_SOURCES = 4; // story needs at least this many outlets to qualify
 const BLINDSPOT_MAX_SHARE = 0.20; // one side must be <=20% of coverage to be a blindspot
 const IMG_MAX_WIDTH = 1280; // cap for CDN image size rewrites (BBC/France24-style token URLs)
@@ -72,8 +72,23 @@ try {
 
 // Outlet logos are downloaded once (at setup) into `logos/` and served from
 // here, so readers' browsers never hit a third-party favicon service. Files
-// have no extension, so content type is sniffed from the leading bytes.
+// are named `{source-slug}.{ext}` (e.g. msnbc.png, theglobeandmail.jpg); the
+// slug is the outlet's domain minus its TLD. Content type comes from the file.
 const LOGO_DIR = path.join(__dirname, "logos");
+function logoSlug(domain) {
+  let d = (domain || "").replace(/^www\./, "");
+  for (const t of [".co.uk", ".com.au", ".com.ua", ".com", ".co", ".org", ".net", ".au", ".ca", ".ua", ".uk", ".eu"]) {
+    if (d.endsWith(t)) { d = d.slice(0, -t.length); break; }
+  }
+  return d.split(".")[0] || "unknown";
+}
+function logoFileFor(domain) {
+  const slug = logoSlug(domain);
+  for (const ext of ["png", "jpg", "jpeg", "gif", "webp"]) {
+    if (fs.existsSync(path.join(LOGO_DIR, `${slug}.${ext}`))) return `${slug}.${ext}`;
+  }
+  return `${slug}.png`;
+}
 function contentTypeFor(buf) {
   if (!buf || buf.length < 4) return "image/x-icon";
   if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return "image/png";
@@ -161,16 +176,16 @@ function decodeEntities(s) {
 // Maps headline tokens to a topic. Order matters: first matching topic wins
 // when a headline mentions keywords from several topics. Extend freely.
 const TOPIC_KEYWORDS = {
-  politics: ["election", "vote", "voter", "ballot", "president", "senate", "congress", "senator", "mp ", "mps", "cabinet", "government", "minister", "campaign", "partisan", "parliament", "rival", "coalition", "candidate", "policy", "impeach", "lawsuit", "court", "judge", "rule", "democracy", "referendum"],
-  economy: ["economy", "economic", "market", "markets", "stock", "stocks", "inflation", "fed", "tariff", "tariffs", "trade", "gdp", "bank", "banks", "rate", "rates", "debt", "deficit", "oil price", "gas price", "recession", "growth", "dollar", "pound", "profit", "earnings", "jobless", "jobs", "unemployment", "wage", "wages", "interest"],
-  tech: ["ai", "artificial intelligence", "tech", "technology", "apple", "google", "meta", "microsoft", "openai", "chatgpt", "chip", "chips", "semiconductor", "nvidia", "robot", "software", "startup", "cyber", "cyberattack", "cyber attack", "hack", "hackers", "algorithm", "quantum", "satellite", "spacex", "tiktok", "facebook", "x (formerly", "elon", "electric vehicle", "ev ", "tesla", "data breach"],
-  health: ["health", "hospital", "hospitals", "vaccine", "covid", "virus", "disease", "outbreak", "cancer", "drug", "drugs", "fda", "doctor", "patients", "mental health", "opioid", "pandemic", "medicare", "medicaid", "treatment", "surgeon"],
-  climate: ["climate", "wildfire", "fires", "flood", "flooding", "storm", "hurricane", "drought", "emission", "emissions", "carbon", "greenhouse", "temperature", "heatwave", "tornado", "sea level", "environment", "environmental", "glacier", "energy", "renewable", "solar", "wind power"],
-  science: ["scientist", "scientists", "study", "research", "space", "nasa", "moon", "mars", "discovery", "archaeologist", "archaeology", "fossil", "physicist", "genetic", "dna", "experiment", "james webb", "astronomer"],
-  crime: ["murder", "shooting", "shootings", "police", "arrest", "arrested", "prosecutor", "indict", "indicted", "prison", "sentenced", "trial", "convict", "crime", "fraud", "smuggling", "gang", "kidnap", "hostage", "gunman"],
-  war: ["war", "missile", "invasion", "airstrike", "air strike", "attack", "troops", "troop", "military", "army", "battle", "bombing", "ceasefire", "casualties", "frontline", "shelling", "occupied", "offensive", "counteroffensive", "arsenal", "artillery", "combat"],
+  Politics: ["election", "vote", "voter", "ballot", "president", "senate", "congress", "senator", "mp ", "mps", "cabinet", "government", "minister", "campaign", "partisan", "parliament", "rival", "coalition", "candidate", "policy", "impeach", "lawsuit", "court", "judge", "rule", "democracy", "referendum"],
+  Economy: ["economy", "economic", "market", "markets", "stock", "stocks", "inflation", "fed", "tariff", "tariffs", "trade", "gdp", "bank", "banks", "rate", "rates", "debt", "deficit", "oil price", "gas price", "recession", "growth", "dollar", "pound", "profit", "earnings", "jobless", "jobs", "unemployment", "wage", "wages", "interest"],
+  Tech: ["ai", "artificial intelligence", "tech", "technology", "apple", "google", "meta", "microsoft", "openai", "chatgpt", "chip", "chips", "semiconductor", "nvidia", "robot", "software", "startup", "cyber", "cyberattack", "cyber attack", "hack", "hackers", "algorithm", "quantum", "satellite", "spacex", "tiktok", "facebook", "x (formerly", "elon", "electric vehicle", "ev ", "tesla", "data breach"],
+  Health: ["health", "hospital", "hospitals", "vaccine", "covid", "virus", "disease", "outbreak", "cancer", "drug", "drugs", "fda", "doctor", "patients", "mental health", "opioid", "pandemic", "medicare", "medicaid", "treatment", "surgeon"],
+  Climate: ["climate", "wildfire", "fires", "flood", "flooding", "storm", "hurricane", "drought", "emission", "emissions", "carbon", "greenhouse", "temperature", "heatwave", "tornado", "sea level", "environment", "environmental", "glacier", "energy", "renewable", "solar", "wind power"],
+  Science: ["scientist", "scientists", "study", "research", "space", "nasa", "moon", "mars", "discovery", "archaeologist", "archaeology", "fossil", "physicist", "genetic", "dna", "experiment", "james webb", "astronomer"],
+  Crime: ["murder", "shooting", "shootings", "police", "arrest", "arrested", "prosecutor", "indict", "indicted", "prison", "sentenced", "trial", "convict", "crime", "fraud", "smuggling", "gang", "kidnap", "hostage", "gunman"],
+  War: ["war", "missile", "invasion", "airstrike", "air strike", "attack", "troops", "troop", "military", "army", "battle", "bombing", "ceasefire", "casualties", "frontline", "shelling", "occupied", "offensive", "counteroffensive", "arsenal", "artillery", "combat"],
 };
-const TOPIC_FALLBACK = "general";
+const TOPIC_FALLBACK = "General";
 function classifyTopic(title) {
   const lower = (title || "").toLowerCase();
   for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
@@ -255,6 +270,33 @@ function sparseCosineSim(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+// Effective "when did this story happen" time — same rule the store uses for
+// ordering and the `hours` cutoff: RSS pubDate wins, created_at is the fallback.
+function articleTime(a) {
+  const pts = a.published_at ? Date.parse(a.published_at) : NaN;
+  const cts = a.created_at ? Date.parse(a.created_at) : NaN;
+  const t = Math.max(pts, cts);
+  return Number.isFinite(t) ? t : 0;
+}
+
+// One representative per cluster for similarity: the earliest article (by
+// articleTime) is the headline the feed card displays, so matching new
+// arrivals against it keeps every member of a cluster on-topic.
+function pickClusterReps(entries, timeOf, vecOf) {
+  const earliest = new Map();
+  for (const e of entries) {
+    const t = timeOf(e);
+    const cur = earliest.get(e.cluster_id);
+    if (!cur || t < cur.t) earliest.set(e.cluster_id, { e, t });
+  }
+  const reps = [];
+  for (const [cluster_id, { e }] of earliest) {
+    const vec = vecOf(e);
+    if (vec) reps.push({ cluster_id, vec });
+  }
+  return reps;
+}
+
 // ---------- ingestion ----------
 // One ingest at a time: boot, the 15-min timer, and manual /api/ingest can
 // all overlap, and running two concurrently would double-fetch feeds and
@@ -308,15 +350,17 @@ async function ingestAllInner() {
   // Load existing recent clustered articles (last 48h) to compare new arrivals against
   const recentClustered = store.recentClusteredArticles(48);
 
-  let newVectors, recentVectors, simFn;
+  let newVectors, clusterReps, simFn;
 
   if (CLUSTER_MODE === "embedding") {
     try {
       const embeddings = await getEmbeddings(newArticles.map((a) => a.title));
       newVectors = embeddings;
-      recentVectors = recentClustered
-        .filter((r) => r.embedding)
-        .map((r) => ({ cluster_id: r.cluster_id, vec: JSON.parse(r.embedding) }));
+      clusterReps = pickClusterReps(
+        recentClustered.filter((r) => r.embedding),
+        articleTime,
+        (r) => JSON.parse(r.embedding)
+      );
       simFn = cosineSim;
     } catch (err) {
       console.error(`[ingest] embed sidecar unreachable (${err.message}) — falling back to tfidf for this run`);
@@ -329,14 +373,21 @@ async function ingestAllInner() {
     const allTitles = [...newArticles.map((a) => a.title), ...recentClustered.map((r) => r.title)];
     const allVecs = buildTfidfVectors(allTitles);
     newVectors = allVecs.slice(0, newArticles.length);
-    recentVectors = recentClustered.map((r, i) => ({
-      cluster_id: r.cluster_id,
-      vec: allVecs[newArticles.length + i],
-    }));
+    clusterReps = pickClusterReps(
+      recentClustered.map((r, i) => ({ cluster_id: r.cluster_id, t: articleTime(r), vec: allVecs[newArticles.length + i] })),
+      (e) => e.t,
+      (e) => e.vec
+    );
     simFn = sparseCosineSim;
   }
 
-  const growingRecent = [...recentVectors];
+  // Match new articles against ONE representative vector per existing cluster
+  // (the earliest article — the headline the card displays), not against every
+  // member. Per-article matching let stories chain transitively: one cluster
+  // grew to 143 unrelated articles. Joined articles are never added as new
+  // candidates, and only freshly created clusters get a representative, which
+  // also stops same-batch chaining.
+  const repsByCluster = new Map(clusterReps.map((r) => [r.cluster_id, r.vec]));
 
   for (let i = 0; i < newArticles.length; i++) {
     const art = newArticles[i];
@@ -344,17 +395,17 @@ async function ingestAllInner() {
     let clusterId = null;
     let bestSim = 0, bestCluster = null;
 
-    for (const existing of growingRecent) {
-      const sim = simFn(vec, existing.vec);
-      if (sim > bestSim) { bestSim = sim; bestCluster = existing.cluster_id; }
+    for (const [cid, repVec] of repsByCluster) {
+      const sim = simFn(vec, repVec);
+      if (sim > bestSim) { bestSim = sim; bestCluster = cid; }
     }
 
     if (bestSim >= CLUSTER_SIM_THRESHOLD) {
       clusterId = bestCluster;
     } else {
       clusterId = store.insertCluster(art.title);
+      repsByCluster.set(clusterId, vec);
     }
-    growingRecent.push({ cluster_id: clusterId, vec });
 
     const embeddingToStore =
       CLUSTER_MODE === "embedding" && Array.isArray(vec) ? JSON.stringify(vec) : null;
@@ -376,6 +427,59 @@ async function ingestAllInner() {
   console.log(`[ingest] done`);
 }
 
+// ---------- one-time re-cluster (representative-based algorithm) ----------
+// Recomputes cluster assignments for every stored article using the same
+// representative matching as ingest, so clusters polluted by the old
+// per-article chaining (e.g. 143 unrelated articles in one cluster) are
+// cleaned up immediately instead of lingering until the 7-day retention prune.
+async function reclusterAll() {
+  const articles = store.allArticles().filter((a) => a.cluster_id !== null && a.cluster_id !== undefined);
+  if (articles.length === 0) return;
+  console.log(`[recluster] re-clustering ${articles.length} stored articles via ${CLUSTER_MODE}...`);
+
+  articles.sort((a, b) => articleTime(a) - articleTime(b));
+
+  let vectors, simFn;
+  if (CLUSTER_MODE === "embedding") {
+    try {
+      vectors = await getEmbeddings(articles.map((a) => a.title));
+      simFn = cosineSim;
+    } catch (err) {
+      console.error(`[recluster] embed sidecar unreachable (${err.message}) — using tfidf for this run`);
+    }
+  }
+  if (!vectors) {
+    vectors = buildTfidfVectors(articles.map((a) => a.title));
+    simFn = sparseCosineSim;
+  }
+
+  const newClusters = [];
+  const repsByCluster = new Map();
+  let created = 0;
+  for (let i = 0; i < articles.length; i++) {
+    const a = articles[i];
+    const vec = vectors[i];
+    let bestSim = 0, bestCid = null;
+    for (const [cid, repVec] of repsByCluster) {
+      const sim = simFn(vec, repVec);
+      if (sim > bestSim) { bestSim = sim; bestCid = cid; }
+    }
+    let cid;
+    if (bestSim >= CLUSTER_SIM_THRESHOLD) {
+      cid = bestCid;
+    } else {
+      cid = store.nextClusterId();
+      newClusters.push({ id: cid, headline: a.title, created_at: a.created_at || new Date().toISOString() });
+      repsByCluster.set(cid, vec);
+      created++;
+    }
+    store.setArticleCluster(a.id, cid);
+  }
+  store.replaceClusters(newClusters);
+  store.flush();
+  console.log(`[recluster] done — ${created} new clusters`);
+}
+
 // ---------- bias tally per story ----------
 function biasForDomain(domain) {
   return biasDb.outlets[domain] || null;
@@ -387,28 +491,61 @@ function outletLabel(domain) {
   return base.split(/[-.]/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 }
 function tallyStory(clusterId) {
-  const articles = store.articlesByCluster(clusterId);
+  const articles = store.articlesByCluster(clusterId); // sorted by publish time asc
+
+  // Per-outlet sources: one primary chip per domain (the outlet's latest
+  // article), with the rest kept under `extra` for the grouped chip UI.
+  // Bias tallies count unique outlets, so one outlet publishing many versions
+  // of the same wire story doesn't skew the left/center/right bar.
+  const byDomain = new Map();
+  for (const a of articles) {
+    const g = byDomain.get(a.domain);
+    if (g) {
+      if (articleTime(a) > articleTime(g.primary)) {
+        g.extras.push(g.primary);
+        g.primary = a;
+      } else {
+        g.extras.push(a);
+      }
+    } else {
+      byDomain.set(a.domain, { primary: a, extras: [] });
+    }
+  }
 
   let left = 0, center = 0, right = 0, rated = 0;
-  const sources = articles.map((a) => {
-    const info = biasForDomain(a.domain);
+  const sources = [...byDomain.entries()].map(([domain, g]) => {
+    const info = biasForDomain(domain);
     if (info) {
       rated++;
       if (info.bias <= -1) left++;
       else if (info.bias >= 1) right++;
       else center++;
     }
-    return { ...a, image: a.image || null, bias: info ? info.bias : null, name: info ? info.name : outletLabel(a.domain), factuality: info ? info.factuality : null };
+    return {
+      id: g.primary.id,
+      domain,
+      title: g.primary.title,
+      link: g.primary.link,
+      published_at: g.primary.published_at,
+      created_at: g.primary.created_at,
+      topic: g.primary.topic || "General",
+      image: g.primary.image || null,
+      bias: info ? info.bias : null,
+      name: info ? info.name : outletLabel(domain),
+      factuality: info ? info.factuality : null,
+      logo: logoFileFor(domain),
+      extra: g.extras.map((x) => ({ id: x.id, link: x.link, title: x.title, published_at: x.published_at || x.created_at || null })),
+    };
   });
 
   // Dominant topic across the cluster's articles (same rule the filter uses),
   // so the tag shown on the card always matches what the filters are doing.
   const topicCount = new Map();
   for (const a of articles) {
-    const t = a.topic || "general";
+    const t = a.topic || "General";
     topicCount.set(t, (topicCount.get(t) || 0) + 1);
   }
-  let topic = "general", topicN = -1;
+  let topic = "General", topicN = -1;
   for (const [t, n] of topicCount) if (n > topicN) { topic = t; topicN = n; }
 
   // Most recent coverage time across the cluster (max effective publish ts).
@@ -416,11 +553,9 @@ function tallyStory(clusterId) {
   // the window, so the card's time must be that same "latest" time — otherwise
   // a still-active wire story would show an old date while passing a 24h filter.
   let publishedAt = null, publishedTs = 0;
-  for (const s of sources) {
-    const pts = s.published_at ? Date.parse(s.published_at) : NaN;
-    const cts = s.created_at ? Date.parse(s.created_at) : NaN;
-    const t = Math.max(pts, cts);
-    if (!Number.isFinite(t)) continue;
+  for (const a of articles) {
+    const t = articleTime(a);
+    if (t === 0) continue;
     if (t > publishedTs) { publishedTs = t; publishedAt = new Date(t).toISOString(); }
   }
 
@@ -428,10 +563,10 @@ function tallyStory(clusterId) {
     clusterId,
     topic,
     headline: articles[0]?.title || "",
-    image: sources.find((s) => s.image)?.image || null,
+    image: articles.find((a) => a.image)?.image || null,
     publishedAt,
-    publishedTs: Number.isFinite(publishedTs) ? publishedTs : 0,
-    sourceCount: articles.length,
+    publishedTs,
+    sourceCount: sources.length,
     ratedCount: rated,
     left, center, right,
     leftPct: rated ? Math.round((left / rated) * 100) : null,
@@ -596,6 +731,18 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if (url.pathname === "/styles.css") {
+      res.writeHead(200, { "Content-Type": "text/css; charset=utf-8", "Cache-Control": "public, max-age=86400" });
+      res.end(fs.readFileSync(path.join(__dirname, "styles.css")));
+      return;
+    }
+
+    if (url.pathname === "/frontend.js") {
+      res.writeHead(200, { "Content-Type": "text/javascript; charset=utf-8", "Cache-Control": "public, max-age=86400" });
+      res.end(fs.readFileSync(path.join(__dirname, "frontend.js")));
+      return;
+    }
+
     if (url.pathname === "/api/feed") {
       const geos = csvParam(url, "geo") || [];
       const topics = csvParam(url, "topic") || [];
@@ -613,14 +760,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname.startsWith("/logo/")) {
-      const domain = decodeURIComponent(url.pathname.slice("/logo/".length));
-      if (!/^[a-zA-Z0-9][a-zA-Z0-9.-]*$/.test(domain)) {
+      const file = decodeURIComponent(url.pathname.slice("/logo/".length));
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(file)) {
         res.writeHead(404);
         res.end("not found");
         return;
       }
       try {
-        const buf = fs.readFileSync(path.join(LOGO_DIR, domain));
+        const buf = fs.readFileSync(path.join(LOGO_DIR, file));
         res.writeHead(200, {
           "Content-Type": contentTypeFor(buf),
           "Cache-Control": "public, max-age=86400",
@@ -653,6 +800,7 @@ const server = http.createServer(async (req, res) => {
         owner: info.owner,
         source: info.source || null,
         geo: feeds.find(f => f.domain === domain)?.geo || null,
+        logo: logoFileFor(domain),
       }));
       json(res, { sources });
       return;
@@ -720,6 +868,19 @@ server.on("error", (err) => {
   console.error(err);
 });
 
-// Ingest on boot, then every 15 minutes
-ingestAll().catch((e) => console.error(e));
+// One-time migration: re-cluster everything with the representative-based
+// algorithm before the first ingest so they don't fight over the same data.
+async function boot() {
+  if (!store.getFlag("reclusteredV2")) {
+    try {
+      await reclusterAll();
+      store.setFlag("reclusteredV2", true);
+    } catch (err) {
+      console.error("[recluster] failed — will retry next boot", err);
+    }
+  }
+  await ingestAll();
+}
+
+boot().catch((e) => console.error(e));
 setInterval(() => ingestAll().catch((e) => console.error(e)), 15 * 60 * 1000);
