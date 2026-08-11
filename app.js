@@ -533,6 +533,7 @@ function tallyStory(clusterId) {
       bias: info ? info.bias : null,
       name: info ? info.name : outletLabel(domain),
       factuality: info ? info.factuality : null,
+      owner: info ? info.owner : null,
       logo: logoFileFor(domain),
       extra: g.extras.map((x) => ({ id: x.id, link: x.link, title: x.title, published_at: x.published_at || x.created_at || null })),
     };
@@ -786,6 +787,8 @@ const server = http.createServer(async (req, res) => {
         ...o,
         label: outletLabel(o.name),
         bias: biasForDomain(o.name)?.bias ?? null,
+        factuality: biasForDomain(o.name)?.factuality ?? null,
+        owner: biasForDomain(o.name)?.owner ?? null,
       }));
       json(res, opts);
       return;

@@ -11,8 +11,10 @@ let hiddenTopics = new Set(JSON.parse(localStorage.getItem("gz-hidden-topics") |
 let hiddenOutlets = new Set(JSON.parse(localStorage.getItem("gz-hidden-outlets") || "[]"));
 const READ_KEY = "gz-read";
 const SAVED_KEY = "gz-saved";
+const NUDGED_KEY = "gz-nudged";
 let readSet = new Set(JSON.parse(localStorage.getItem(READ_KEY) || "[]"));
 let savedSet = new Set(JSON.parse(localStorage.getItem(SAVED_KEY) || "[]"));
+let nudgedSet = new Set(JSON.parse(localStorage.getItem(NUDGED_KEY) || "[]"));
 let unreadOnly = false;
 const PAGE = 50;
 let offset = 0;
@@ -88,6 +90,7 @@ function renderStory(story, opts = {}) {
   const div = document.createElement("div");
   div.className = "story";
   div.dataset.story = story.clusterId;
+  div._sources = story.sources;
 
   let blindspotTag = "";
   if (opts.blindspot) {
@@ -109,11 +112,16 @@ function renderStory(story, opts = {}) {
     const moreBtn = (s.extra && s.extra.length)
       ? `<button class="src-more" title="${s.extra.length} more update${s.extra.length > 1 ? "s" : ""} from ${escapeHtml(s.name)}">▾${s.extra.length}</button>`
       : "";
+    const facDot = (s.factuality !== null && s.factuality !== undefined)
+      ? `<span class="fac-dot fac-${s.factuality >= 7 ? "hi" : s.factuality >= 5 ? "mid" : "lo"}" title="Factuality ${s.factuality}/10"></span>`
+      : "";
+    const ownerTip = s.owner ? ` · ${s.owner}` : "";
     return `
     <div class="source-group">
       <div class="src-row">
-        <a href="${s.link}" target="_blank" rel="noopener" class="source-chip bias-${biasClass(s.bias)}" title="${escapeHtml(s.name + (seen ? " — seen " + seen : ""))}"
-           onclick="trackClick(${s.id}, ${story.clusterId})"><img class="src-logo" src="/logo/${encodeURIComponent(s.logo)}?v=3" alt="" loading="lazy" onerror="this.style.display='none'">${s.name}</a>
+        <a href="${s.link}" target="_blank" rel="noopener" class="source-chip bias-${biasClass(s.bias)}" data-aid="${s.id}"
+           title="${escapeHtml(s.name + (s.factuality !== null && s.factuality !== undefined ? ` — factuality ${s.factuality}/10` : "") + ownerTip + (seen ? " · seen " + seen : ""))}"
+           onclick="trackClick(${s.id}, ${story.clusterId})"><img class="src-logo" src="/logo/${encodeURIComponent(s.logo)}?v=3" alt="" loading="lazy" onerror="this.style.display='none'">${s.name}${facDot}</a>
         ${moreBtn}
       </div>
       ${extras ? `<div class="src-extra">${extras}</div>` : ""}
@@ -144,6 +152,8 @@ function renderStory(story, opts = {}) {
       ${story.ratedCount ? `<span>${story.leftPct}% left · ${story.centerPct}% center · ${story.rightPct}% right</span>` : ""}
       ${saveBtn}
     </div>
+    <button class="framing-toggle">Compare ${story.sources.length} headlines</button>
+    <div class="framing hidden">${buildFraming(story)}</div>
     <div class="sources">${chips}</div>
     <button class="sources-toggle hidden">Show all sources</button>
   `;
@@ -169,6 +179,42 @@ function updateSourcesToggle(section) {
   if (!toggle) return;
   const n = section.querySelectorAll(".source-group").length;
   toggle.textContent = section.classList.contains("expanded") ? "Show less" : `Show all ${n} sources`;
+}
+
+function buildFraming(story) {
+  const sides = [
+    { key: "l", label: "Left-leaning", pick: (s) => s.bias !== null && s.bias <= -1 },
+    { key: "c", label: "Center / unrated", pick: (s) => s.bias === null || s.bias === 0 },
+    { key: "r", label: "Right-leaning", pick: (s) => s.bias !== null && s.bias >= 1 },
+  ];
+  const byTime = (s) => {
+    const t = s.published_at || s.created_at;
+    return t ? new Date(t).getTime() : Infinity;
+  };
+  let first = null, firstTs = Infinity;
+  for (const s of story.sources) {
+    const t = byTime(s);
+    if (t < firstTs) { firstTs = t; first = s.name; }
+  }
+  const cols = sides.map((side) => {
+    const items = story.sources.filter(side.pick).sort((a, b) => byTime(a) - byTime(b)).map((s) => {
+      const t = s.published_at || s.created_at;
+      const firstBadge = s.name === first ? `<span class="framing-first" title="Earliest outlet on this story">First to break</span>` : "";
+      return `
+      <div class="framing-row">
+        <img class="src-logo" src="/logo/${encodeURIComponent(s.logo)}?v=3" alt="" loading="lazy" onerror="this.style.display='none'">
+        <div class="framing-body">
+          <div class="framing-name">${escapeHtml(s.name)}${firstBadge}</div>
+          <a class="framing-headline" href="${s.link}" target="_blank" rel="noopener" onclick="trackClick(${s.id}, ${story.clusterId})">${escapeHtml(s.title || "")}</a>
+          ${t ? `<div class="framing-time">${timeAgo(t)}</div>` : ""}
+        </div>
+      </div>`;
+    });
+    return items.length
+      ? `<div class="framing-col"><div class="framing-col-head">${side.label}</div>${items.join("")}</div>`
+      : "";
+  }).join("");
+  return cols;
 }
 
 function escapeHtml(s) {
@@ -200,9 +246,30 @@ function trackClick(articleId, clusterId) {
     persistSet(READ_KEY, readSet);
     const el = document.querySelector(`.story[data-story="${clusterId}"] .unread-dot`);
     if (el) el.remove();
+    refreshUnreadBadge();
   }
 }
 window.trackClick = trackClick;
+
+function maybeNudgeOtherSide(chip, storyEl) {
+  if (!chip || !storyEl || !storyEl._sources) return;
+  const clicked = chip.classList.contains("bias-l") ? "left"
+    : chip.classList.contains("bias-r") ? "right" : "center";
+  if (clicked === "center" || storyEl.querySelector(".nudge")) return;
+  const cid = storyEl.dataset.story;
+  if (nudgedSet.has(cid)) return;
+  const otherSide = clicked === "left" ? "right" : "left";
+  const target = storyEl._sources.find((s) =>
+    otherSide === "right" ? (s.bias !== null && s.bias >= 1) : (s.bias !== null && s.bias <= -1)
+  );
+  if (!target) return;
+  nudgedSet.add(cid);
+  persistSet(NUDGED_KEY, nudgedSet);
+  const banner = document.createElement("div");
+  banner.className = "nudge";
+  banner.innerHTML = `Read the other side: you opened a ${clicked}-leaning outlet. <a href="${target.link}" target="_blank" rel="noopener" onclick="trackClick(${target.id}, ${cid})">${escapeHtml(target.name)}</a> covers this story too.`;
+  storyEl.querySelector(".sources").after(banner);
+}
 
 // ---------- feed fetching + filters ----------
 function feedParams(off) {
@@ -296,6 +363,7 @@ async function loadFeed() {
   stories.forEach(s => content.appendChild(renderStory(s)));
   observeStories();
   appendLoadMore();
+  refreshUnreadBadge();
 }
 
 async function loadMore() {
@@ -309,6 +377,7 @@ async function loadMore() {
   stories.forEach(s => content.appendChild(renderStory(s)));
   observeStories();
   if (hasMore) appendLoadMore();
+  refreshUnreadBadge();
 }
 
 async function loadBlindspots() {
@@ -504,6 +573,7 @@ function observeStories() {
             if (dot) dot.remove();
           }
         });
+        refreshUnreadBadge();
       }
     }, { threshold: 0.15 });
   }
@@ -513,6 +583,18 @@ function observeStories() {
 }
 
 content.addEventListener("click", (e) => {
+  const framingToggle = e.target.closest(".framing-toggle");
+  if (framingToggle) {
+    const story = framingToggle.closest(".story");
+    const framing = story && story.querySelector(".framing");
+    if (framing) {
+      framing.classList.toggle("hidden");
+      framingToggle.textContent = framing.classList.contains("hidden")
+        ? `Compare ${story.querySelectorAll(".framing-row").length} headlines`
+        : "Hide comparison";
+    }
+    return;
+  }
   const moreBtn = e.target.closest(".src-more");
   if (moreBtn) {
     const section = moreBtn.closest(".sources");
@@ -530,6 +612,12 @@ content.addEventListener("click", (e) => {
       section.classList.toggle("expanded");
       updateSourcesToggle(section);
     }
+    return;
+  }
+  const chip = e.target.closest(".source-chip");
+  if (chip) {
+    const story = chip.closest(".story");
+    maybeNudgeOtherSide(chip, story);
     return;
   }
   const btn = e.target.closest(".save-btn");
@@ -569,15 +657,64 @@ async function loadMyBias() {
         <span class="hist-pct">${d.left}L · ${d.center}C · ${d.right}R</span>
       </div>`).join("");
   }
+
+  const today = b.history && b.history.length ? b.history[b.history.length - 1] : null;
+  let meter = "", missing = "";
+  if (today && today.total > 0) {
+    const lead = today.leftPct > today.rightPct ? "left" : today.rightPct > today.leftPct ? "right" : "center";
+    const leadTxt = lead === "left" ? "left" : lead === "right" ? "right" : "center";
+    const otherSide = lead === "left" ? "right" : lead === "right" ? "left" : null;
+    meter = `
+      <div class="balance-meter">
+        <div class="balance-lead">Today you read <strong>${today.leftPct}% ${leadTxt}-leaning</strong></div>
+        <div class="hist-bar">
+          <div class="l" style="width:${today.leftPct}%"></div>
+          <div class="c" style="width:${today.centerPct}%"></div>
+          <div class="r" style="width:${today.rightPct}%"></div>
+        </div>
+        <div class="hist-pct">${today.leftPct}% left · ${today.centerPct}% center · ${today.rightPct}% right</div>
+      </div>`;
+    if (otherSide) {
+      try {
+        const feedRes = await fetch("/api/feed?limit=100");
+        const feed = await feedRes.json();
+        const missStories = feed.filter(s => dominantBias(s) === otherSide).slice(0, 5);
+        if (missStories.length) {
+          missing = `
+            <div class="hist-title">${otherSide === "left" ? "Left" : "Right"}-leaning coverage you're missing</div>
+            <div class="missing-list">
+              ${missStories.map(s => `<a class="missing-story" href="#feed" onclick="showSideInFeed('${otherSide}');return false;">${escapeHtml(s.headline)}</a>`).join("")}
+            </div>
+            <button class="missing-go" onclick="showSideInFeed('${otherSide}')">Show ${otherSide}-leaning in feed</button>`;
+        }
+      } catch {}
+    }
+  }
+
   content.innerHTML = `
     <div class="my-bias-summary">
       <strong style="color:var(--text)">Your reading, ${b.totalClicks} click${b.totalClicks === 1 ? "" : "s"} tracked</strong><br><br>
       Left: ${b.leftPct}% (${b.left}) &nbsp; Center: ${b.centerPct}% (${b.center}) &nbsp; Right: ${b.rightPct}% (${b.right})
       ${b.unrated ? `<br>Unrated outlet clicks: ${b.unrated}` : ""}
     </div>
+    ${meter}
+    ${missing}
     ${hist || `<div class="empty">No tracked clicks in the last 7 days.</div>`}
   `;
 }
+
+function showSideInFeed(side) {
+  filters.biases = new Set([side]);
+  currentTab = "feed";
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("active", x.dataset.tab === "feed"));
+  document.getElementById("sidebar").style.display = "";
+  document.getElementById("layout").classList.toggle("sources-view", false);
+  syncChips();
+  syncResetButtons();
+  writeStateToUrl("push");
+  load({ reset: true });
+}
+window.showSideInFeed = showSideInFeed;
 
 // ---------- sidebar: filter chips ----------
 async function loadFilters() {
@@ -764,6 +901,32 @@ window.addEventListener("popstate", () => {
   syncSortChips();
   load();
 });
+
+// ---------- keyboard navigation: j / k move through story cards ----------
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  if (currentTab === "sources") return;
+  if (e.key !== "j" && e.key !== "k") return;
+  e.preventDefault();
+  const storyEls = [...content.querySelectorAll(".story")];
+  if (!storyEls.length) return;
+  const active = content.querySelector(".story.active-key");
+  let idx = active ? storyEls.indexOf(active) : -1;
+  idx = Math.max(0, Math.min(storyEls.length - 1, idx + (e.key === "j" ? 1 : -1)));
+  storyEls.forEach(el => el.classList.remove("active-key"));
+  const el = storyEls[idx];
+  el.classList.add("active-key");
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+});
+
+// ---------- unread count badge on the Feed tab ----------
+function refreshUnreadBadge() {
+  const feedBtn = document.querySelector('#tabs button[data-tab="feed"]');
+  if (!feedBtn) return;
+  const n = content.querySelectorAll(".story .unread-dot").length;
+  feedBtn.textContent = n ? `Feed (${n})` : "Feed";
+}
 
 function syncSortChips() {
   document.querySelectorAll("#sort-chips .chip").forEach(c => {
