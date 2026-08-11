@@ -22,7 +22,7 @@ the political spectrum — and where your own blind spots are.
 
 ## Getting started
 
-<a href="https://newspop.odesaplay.com.ua/">Try it out on Newspop.OdesaPlay.com.ua</a>
+<a href="https://newspop.odesaplay.com.ua/">Try it out on OdesaPlay</a>
 
 ```bash
 node app.js
