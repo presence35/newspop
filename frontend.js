@@ -52,10 +52,21 @@ const collapseBtn = document.getElementById("collapse-sidebar");
 let sidebarCollapsed = localStorage.getItem("gz-sidebar") === "1";
 function applySidebar() {
   document.getElementById("layout").classList.toggle("collapsed", sidebarCollapsed);
-  collapseBtn.textContent = sidebarCollapsed ? "›" : "‹";
+  collapseBtn.classList.toggle("collapsed", sidebarCollapsed);
   collapseBtn.title = sidebarCollapsed ? "Show filters" : "Hide filters";
 }
+const mqMobile = window.matchMedia("(max-width: 800px)");
+const mobileFilterBtn = document.getElementById("mobile-filters");
+const filterBackdrop = document.getElementById("filter-backdrop");
+function setDrawer(open) {
+  sidebar.classList.toggle("mobile-open", open);
+  filterBackdrop.classList.toggle("show", open);
+}
+mobileFilterBtn.addEventListener("click", () => setDrawer(true));
+filterBackdrop.addEventListener("click", () => setDrawer(false));
+mqMobile.addEventListener("change", (e) => { if (!e.matches) setDrawer(false); });
 collapseBtn.addEventListener("click", () => {
+  if (mqMobile.matches) { setDrawer(false); return; }
   sidebarCollapsed = !sidebarCollapsed;
   localStorage.setItem("gz-sidebar", sidebarCollapsed ? "1" : "0");
   applySidebar();
@@ -73,6 +84,7 @@ tabs.addEventListener("click", (e) => {
   document.querySelectorAll("#tabs button").forEach(b => b.classList.remove("active"));
   e.target.classList.add("active");
   currentTab = e.target.dataset.tab;
+  if (mqMobile.matches) setDrawer(false);
   document.getElementById("sidebar").style.display = currentTab === "sources" ? "none" : "";
   document.getElementById("layout").classList.toggle("sources-view", currentTab === "sources");
   load({ reset: true });
@@ -152,8 +164,8 @@ function renderStory(story, opts = {}) {
       ${story.ratedCount ? `<span>${story.leftPct}% left · ${story.centerPct}% center · ${story.rightPct}% right</span>` : ""}
       ${saveBtn}
     </div>
-    <button class="framing-toggle">Compare ${story.sources.length} headlines</button>
-    <div class="framing hidden">${buildFraming(story)}</div>
+    ${story.sources.length > 1 ? `<button class="framing-toggle">Compare ${story.sources.length} headline${story.sources.length === 1 ? "" : "s"}</button>
+    <div class="framing hidden">${buildFraming(story)}</div>` : ""}
     <div class="sources">${chips}</div>
     <button class="sources-toggle hidden">Show all sources</button>
   `;
@@ -206,7 +218,7 @@ function buildFraming(story) {
         <div class="framing-body">
           <div class="framing-name">${escapeHtml(s.name)}${firstBadge}</div>
           <a class="framing-headline" href="${s.link}" target="_blank" rel="noopener" onclick="trackClick(${s.id}, ${story.clusterId})">${escapeHtml(s.title || "")}</a>
-          ${t ? `<div class="framing-time">${timeAgo(t)}</div>` : ""}
+          ${t ? `<div class="framing-time" title="${new Date(t).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}">${timeAgo(t)}</div>` : ""}
         </div>
       </div>`;
     });
@@ -590,7 +602,7 @@ content.addEventListener("click", (e) => {
     if (framing) {
       framing.classList.toggle("hidden");
       framingToggle.textContent = framing.classList.contains("hidden")
-        ? `Compare ${story.querySelectorAll(".framing-row").length} headlines`
+        ? `Compare ${story.querySelectorAll(".framing-row").length} headline${story.querySelectorAll(".framing-row").length === 1 ? "" : "s"}`
         : "Hide comparison";
     }
     return;

@@ -109,7 +109,15 @@ function parseRss(xml) {
     const title = extractTag(block, "title");
     const link = extractTag(block, "link");
     const pubDate = extractTag(block, "pubDate") || extractTag(block, "dc:date");
-    if (title && link) items.push({ title: decodeEntities(title), link: link.trim(), pubDate, image: extractImage(block) });
+    if (title && link) items.push({
+      title: decodeEntities(title),
+      link: decodeEntities(link).trim(),
+      pubDate,
+      image: extractImage(block),
+      categories: (block.match(/<category\b[^>]*>[\s\S]*?<\/category>/gi) || [])
+        .map((t) => decodeEntities(t.replace(/<[^>]+>/g, " ")).trim())
+        .filter(Boolean),
+    });
   }
   return items;
 }
@@ -136,7 +144,7 @@ function extractImage(block) {
   }
   if (candidates.length === 0) return null;
   candidates.sort((a, b) => b.w * b.h - a.w * a.h || b.w - a.w);
-  return upscaleImage(candidates[0].url);
+  return decodeEntities(upscaleImage(candidates[0].url));
 }
 
 function upscaleImage(url) {
@@ -161,37 +169,137 @@ function extractTag(block, tag) {
   if (!m) return null;
   return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/, "$1").trim();
 }
+const NAMED_ENTITIES = {
+  apos: "'", nbsp: "\u00a0", hellip: "\u2026", ndash: "\u2013", mdash: "\u2014",
+  lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201c", rdquo: "\u201d",
+  amp: "&", lt: "<", gt: ">", quot: '"', copy: "\u00a9", reg: "\u00ae", trade: "\u2122",
+  eacute: "\u00e9", egrave: "\u00e8", agrave: "\u00e0", ntilde: "\u00f1", aacute: "\u00e1",
+};
 function decodeEntities(s) {
   return s
     .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
     .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&([a-zA-Z0-9]+);/g, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
 }
 
-// ---------- topic classification (zero-dependency keyword lexicon) ----------
-// Maps headline tokens to a topic. Order matters: first matching topic wins
-// when a headline mentions keywords from several topics. Extend freely.
-const TOPIC_KEYWORDS = {
-  Politics: ["election", "vote", "voter", "ballot", "president", "senate", "congress", "senator", "mp ", "mps", "cabinet", "government", "minister", "campaign", "partisan", "parliament", "rival", "coalition", "candidate", "policy", "impeach", "lawsuit", "court", "judge", "rule", "democracy", "referendum"],
-  Economy: ["economy", "economic", "market", "markets", "stock", "stocks", "inflation", "fed", "tariff", "tariffs", "trade", "gdp", "bank", "banks", "rate", "rates", "debt", "deficit", "oil price", "gas price", "recession", "growth", "dollar", "pound", "profit", "earnings", "jobless", "jobs", "unemployment", "wage", "wages", "interest"],
-  Tech: ["ai", "artificial intelligence", "tech", "technology", "apple", "google", "meta", "microsoft", "openai", "chatgpt", "chip", "chips", "semiconductor", "nvidia", "robot", "software", "startup", "cyber", "cyberattack", "cyber attack", "hack", "hackers", "algorithm", "quantum", "satellite", "spacex", "tiktok", "facebook", "x (formerly", "elon", "electric vehicle", "ev ", "tesla", "data breach"],
-  Health: ["health", "hospital", "hospitals", "vaccine", "covid", "virus", "disease", "outbreak", "cancer", "drug", "drugs", "fda", "doctor", "patients", "mental health", "opioid", "pandemic", "medicare", "medicaid", "treatment", "surgeon"],
-  Climate: ["climate", "wildfire", "fires", "flood", "flooding", "storm", "hurricane", "drought", "emission", "emissions", "carbon", "greenhouse", "temperature", "heatwave", "tornado", "sea level", "environment", "environmental", "glacier", "energy", "renewable", "solar", "wind power"],
-  Science: ["scientist", "scientists", "study", "research", "space", "nasa", "moon", "mars", "discovery", "archaeologist", "archaeology", "fossil", "physicist", "genetic", "dna", "experiment", "james webb", "astronomer"],
-  Crime: ["murder", "shooting", "shootings", "police", "arrest", "arrested", "prosecutor", "indict", "indicted", "prison", "sentenced", "trial", "convict", "crime", "fraud", "smuggling", "gang", "kidnap", "hostage", "gunman"],
-  War: ["war", "missile", "invasion", "airstrike", "air strike", "attack", "troops", "troop", "military", "army", "battle", "bombing", "ceasefire", "casualties", "frontline", "shelling", "occupied", "offensive", "counteroffensive", "arsenal", "artillery", "combat"],
-};
+// ---------- topic classifier (trained from publisher labels, zero-dependency) ----------
+// Best practice: don't hand-maintain headline keyword lists (they grow forever).
+// Instead, learn from labels the publishers already provide — item-level
+// <category> tags and per-feed section topics — and generalize to unlabeled
+// headlines with a tiny multinomial Naive Bayes (pure JS, no deps). Retrained
+// on every ingest; nothing accumulates by hand.
 const TOPIC_FALLBACK = "General";
-function classifyTopic(title) {
-  const lower = (title || "").toLowerCase();
-  for (const [topic, keywords] of Object.entries(TOPIC_KEYWORDS)) {
-    if (keywords.some((k) => lower.includes(k))) return topic;
+
+// Taxonomy bridge: maps the publisher's section/category vocabulary to our
+// coarse topics. Word-boundary matched against normalized category tags. This
+// is small and fixed — a vocabulary bridge, not a headline-keyword list.
+const CATEGORY_SYNONYMS = {
+  Politics: ["politics", "election", "congress", "senate", "parliament", "candidate", "campaign", "government", "legislation", "diplomacy"],
+  Economy: ["business", "economy", "economic", "markets", "market", "finance", "financial", "money", "companies", "commodities", "jobs", "work", "trade"],
+  Tech: ["technology", "tech", "computing", "software", "internet", "digital", "artificial intelligence", "gadgets", "telecoms"],
+  Health: ["health", "healthcare", "medicine", "medical", "disease", "wellness", "nutrition", "pandemic", "clinical"],
+  Climate: ["climate", "environment", "environmental", "weather", "energy", "pollution", "biodiversity", "conservation"],
+  Science: ["science", "research", "space", "astronomy", "archaeology", "discovery", "genetics", "physics"],
+  Crime: ["crime", "criminal", "courts", "law", "policing", "justice"],
+  War: ["war", "conflict", "military", "armed", "defence", "defense", "frontline"],
+};
+const CATEGORY_REGEX_CACHE = new Map();
+function topicFromCategory(cat) {
+  const norm = " " + (cat || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim() + " ";
+  for (const [topic, syns] of Object.entries(CATEGORY_SYNONYMS)) {
+    for (const s of syns) {
+      let re = CATEGORY_REGEX_CACHE.get(s);
+      if (!re) {
+        re = new RegExp(`\\b${s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+        CATEGORY_REGEX_CACHE.set(s, re);
+      }
+      if (re.test(norm)) return topic;
+    }
   }
-  return TOPIC_FALLBACK;
+  return null;
+}
+
+const NAIVE_ALPHA = 1.0; // add-one smoothing, no zero probabilities
+const TOPIC_CONF_MIN = 0.4; // below this the model is unsure -> General
+const MIN_TRAIN_DOCS = 120; // model needs this much labeled data before its guesses are used
+let topicModel = { classes: [], tc: new Map(), wc: new Map(), totals: new Map(), vocSize: 0 };
+function trainTopicModel(pairs) {
+  const tc = new Map(), wc = new Map(), totals = new Map(), voc = new Set();
+  for (const p of pairs) {
+    const topic = p.topic || TOPIC_FALLBACK;
+    const terms = tokenize(p.title);
+    tc.set(topic, (tc.get(topic) || 0) + 1);
+    let tw = wc.get(topic);
+    if (!tw) { tw = new Map(); wc.set(topic, tw); }
+    for (const t of terms) { tw.set(t, (tw.get(t) || 0) + 1); voc.add(t); }
+    totals.set(topic, (totals.get(topic) || 0) + terms.length);
+  }
+  topicModel = { classes: [...tc.keys()], tc, wc, totals, vocSize: voc.size };
+}
+function modelIsTrustworthy() {
+  const { classes, tc } = topicModel;
+  if (classes.length < 2) return false; // a single-topic training set predicts everything as that topic
+  let total = 0;
+  for (const c of classes) total += tc.get(c);
+  return total >= MIN_TRAIN_DOCS;
+}
+function predictTopic(title) {
+  const { classes, tc, wc, totals, vocSize } = topicModel;
+  if (classes.length === 0) return { topic: TOPIC_FALLBACK, conf: 0 };
+  const terms = tokenize(title);
+  let totalDocs = 0;
+  for (const c of classes) totalDocs += tc.get(c);
+  const raw = [];
+  for (const c of classes) {
+    const tw = wc.get(c) || new Map();
+    const denom = (totals.get(c) || 0) + NAIVE_ALPHA * vocSize;
+    let logp = Math.log(tc.get(c) / totalDocs);
+    for (const t of terms) logp += Math.log(((tw.get(t) || 0) + NAIVE_ALPHA) / denom);
+    raw.push([c, logp]);
+  }
+  const m = Math.max(...raw.map((r) => r[1]));
+  let sum = 0;
+  const exps = raw.map(([c, l]) => { const e = Math.exp(l - m); sum += e; return [c, e]; });
+  const best = exps.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const conf = best[1] / sum;
+  return { topic: conf >= TOPIC_CONF_MIN ? best[0] : TOPIC_FALLBACK, conf };
+}
+// Per-domain feed topic, only when unambiguous (a fixed section like Politico's
+// politics feed). Domains with several mixed feeds (e.g. Guardian world/au)
+// resolve to "no label" rather than an arbitrary guess.
+function feedTopicForDomain(domain) {
+  const byDomain = new Map();
+  for (const f of feeds) {
+    if (!f.topic) continue;
+    if (!byDomain.has(f.domain)) byDomain.set(f.domain, new Set());
+    byDomain.get(f.domain).add(f.topic);
+  }
+  const s = byDomain.get(domain);
+  return s && s.size === 1 ? [...s][0] : null;
+}
+// Label precedence: item-level publisher category tags (most precise) -> the
+// feed's declared section topic -> the trained model's guess. The model only
+// gets to speak once it has enough multi-topic evidence; until then unlabeled
+// headlines are honestly "General" rather than every-story-one-topic.
+// `source` lets the re-tag pass skip model guesses it can't yet trust.
+function classifyArticle({ title, categories = [], feedTopic = null }) {
+  for (const cat of categories) {
+    const t = topicFromCategory(cat);
+    if (t) return { topic: t, source: "category" };
+  }
+  if (feedTopic) return { topic: feedTopic, source: "feed" };
+  if (modelIsTrustworthy()) return { topic: predictTopic(title).topic, source: "model" };
+  return { topic: TOPIC_FALLBACK, source: "model-untrusted" };
+}
+function labelsForTraining() {
+  const pairs = [];
+  for (const a of store.allArticles()) {
+    let label = null;
+    for (const cat of a.categories || []) { const t = topicFromCategory(cat); if (t) { label = t; break; } }
+    if (!label) label = feedTopicForDomain(a.domain);
+    if (label) pairs.push({ title: a.title, topic: label });
+  }
+  return pairs;
 }
 
 // ---------- embedding + similarity (embedding mode) ----------
@@ -332,7 +440,7 @@ async function ingestAllInner() {
       let added = 0;
       for (const item of items) {
         if (store.findArticleByLink(item.link)) continue;
-        newArticles.push({ ...item, domain: feed.domain, geo: feed.geo, topic: classifyTopic(item.title) });
+        newArticles.push({ ...item, domain: feed.domain, geo: feed.geo, topic: classifyArticle({ title: item.title, categories: item.categories || [], feedTopic: feed.topic || null }).topic });
         added++;
       }
       bootLog(`[ingest] ${feed.domain}: ${items.length} items, ${added} new`);
@@ -420,10 +528,12 @@ async function ingestAllInner() {
       cluster_id: clusterId,
       embedding: embeddingToStore,
       image: art.image || null,
+      categories: art.categories || [],
     });
   }
 
   store.flush();
+  trainTopicModel(labelsForTraining());
   console.log(`[ingest] done`);
 }
 
@@ -881,6 +991,25 @@ async function boot() {
     } catch (err) {
       console.error("[recluster] failed — will retry next boot", err);
     }
+  }
+  // Re-topic pass: stored articles carry labels from the old keyword classifier.
+  // Re-run every boot, but only apply labels the classifier can stand behind —
+  // publisher category tags, feed-declared sections, or model guesses only once
+  // the model is trained on real multi-topic data. Low-confidence guesses
+  // ("General") never overwrite an existing label, so this converges instead of
+  // clobbering. As more tagged articles accumulate, more stored stories improve.
+  {
+    trainTopicModel(labelsForTraining());
+    const updates = new Map();
+    for (const a of store.allArticles()) {
+      if (a.cluster_id === null || a.cluster_id === undefined) continue;
+      const { topic, source } = classifyArticle({ title: a.title, categories: a.categories || [], feedTopic: feedTopicForDomain(a.domain) });
+      const safe = source === "category" || source === "feed" || (source === "model" && topic !== TOPIC_FALLBACK);
+      if (safe) updates.set(a.id, topic);
+    }
+    const reTagged = store.setArticleTopics(updates);
+    store.flush();
+    if (reTagged > 0) console.log(`[topics] re-tagged ${reTagged} stored articles`);
   }
   await ingestAll();
 }

@@ -62,6 +62,7 @@ export function createStore(dataDir) {
     if (a.image === undefined) a.image = null;
     if (a.topic === undefined) a.topic = "General";
     else if (TOPIC_CASES[a.topic]) a.topic = TOPIC_CASES[a.topic];
+    if (a.categories === undefined) a.categories = [];
   }
 
   let dirty = false;
@@ -81,7 +82,7 @@ export function createStore(dataDir) {
     findArticleByLink(link) {
       return data.articles.find((a) => a.link === link) || null;
     },
-    insertArticle({ domain, title, link, published_at, geo, topic, cluster_id, embedding, image }) {
+    insertArticle({ domain, title, link, published_at, geo, topic, cluster_id, embedding, image, categories }) {
       if (data.articles.some((a) => a.link === link)) return null; // INSERT OR IGNORE equivalent
       const id = data.nextId.article++;
       const row = {
@@ -90,6 +91,7 @@ export function createStore(dataDir) {
         geo, topic: topic || "General",
         cluster_id, embedding: embedding || null,
         image: image || null,
+        categories: categories || [],
         created_at: new Date().toISOString(),
       };
       data.articles.push(row);
@@ -201,6 +203,16 @@ export function createStore(dataDir) {
       a.cluster_id = clusterId;
       markDirty();
       return true;
+    },
+    // Batch re-topic pass (e.g. after a classifier upgrade). Map: articleId -> topic.
+    setArticleTopics(updates) {
+      let changed = 0;
+      for (const a of data.articles) {
+        const t = updates.get(a.id);
+        if (t && t !== a.topic) { a.topic = t; changed++; }
+      }
+      if (changed) markDirty();
+      return changed;
     },
     nextClusterId() {
       return data.nextId.cluster++;
