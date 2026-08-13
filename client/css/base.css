@@ -1,0 +1,268 @@
+  :root {
+    --bg: #111214;
+    --panel: #1a1c1f;
+    --border: #2a2d31;
+    --text: #e8e8e8;
+    --muted: #8a8d93;
+    --left: #4a90d9;
+    --center: #999999;
+    --right: #d94a4a;
+    --accent: #e8e8e8;
+    --on: #4caf50;
+    --header-h: 61px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  header .brand {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  header .brand-logo {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .brand-version {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: normal;
+    line-height: 1;
+  }
+  header h1 {
+    font-size: 18px;
+    margin: 0;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--left), var(--center), var(--right));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header .tagline {
+    margin: 0 0 0 10px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: nowrap;
+  }
+  #collapse-sidebar {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #collapse-sidebar svg { transition: transform 0.2s ease; }
+  #collapse-sidebar.collapsed svg { transform: rotate(180deg); }
+  #collapse-sidebar:hover { color: var(--text); border-color: var(--text); }
+  .side-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .side-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  nav { display: flex; gap: 4px; }
+  nav button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ic {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: block;
+  }
+  #mobile-filters {
+    display: none;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+  }
+  #mobile-filters:hover { border-color: var(--text); }
+  #filter-backdrop { display: none; }
+  nav button.active {
+    color: var(--text);
+    border-color: var(--text);
+  }
+  nav button[data-tab="sources"] {
+    margin-left: auto;
+  }
+  #layout {
+    max-width: 980px;
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-start;
+    padding: 16px;
+    gap: 20px;
+  }
+  #layout.sources-view { max-width: 1500px; }
+  #layout.sources-view main { max-width: none; }
+  #layout.collapsed #sidebar { width: 34px; padding: 10px 6px; overflow: hidden; }
+  #layout.collapsed .side-body,
+  #layout.collapsed .side-title { display: none; }
+  #layout.collapsed .brand-version { display: none; }
+  #layout.collapsed .side-top { justify-content: center; }
+  #sidebar {
+    width: 216px;
+    scrollbar-gutter: stable;
+    flex-shrink: 0;
+    position: sticky;
+    top: var(--header-h);
+    height: calc(100vh - var(--header-h));
+    overflow-y: auto;
+    padding-right: 8px;
+    box-sizing: border-box;
+  }
+  #sidebar section { margin-bottom: 20px; }
+  #sidebar h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 8px 0;
+  }
+  main {
+    flex: 1;
+    min-width: 0;
+    max-width: 720px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: none;
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chip.on {
+    color: #4caf50;
+    border-color: #4caf50;
+    background: rgba(76,175,80,0.12);
+  }
+  .chip.off {
+    color: var(--muted);
+    border-color: var(--border);
+  }
+  .chip-count { font-size: 10px; color: var(--muted); opacity: 0.7; }
+  .chip-name { overflow-wrap: anywhere; }
+  .pill-x {
+    margin-left: 2px;
+    font-size: 11px;
+    line-height: 1;
+    color: var(--muted);
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 1px 3px;
+  }
+  .pill-x:hover { color: #e05252; background: rgba(224,82,82,0.15); }
+  #geo-chips, #topic-chips {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  #geo-chips .chip, #topic-chips .chip {
+    justify-content: flex-start;
+    padding: 5px 10px;
+  }
+  #geo-chips .chip-count, #topic-chips .chip-count { margin-left: auto; }
+  .sec-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sec-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+  .bulk-btn { gap: 3px; }
+  .bulk-btn .ic { width: 12px; height: 12px; }
+  .reset-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 2px 4px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .reset-btn:hover { color: var(--text); }
+  .reset-btn.hidden { display: none; }
+  #search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  #exclude-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+  #exclude-chips .chip { padding-right: 6px; }
+  #time-chips .chip { white-space: nowrap; }

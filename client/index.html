@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NewsPop</title>
+<meta name="description" content="Local-first news reader showing the same story across the political spectrum.">
+<meta name="theme-color" content="#111214">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/png" href="/logo/icon-192.png">
+<link rel="apple-touch-icon" href="/logo/icon-192.png">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/feed.css">
+<link rel="stylesheet" href="/css/sources.css">
+<link rel="stylesheet" href="/css/mybias.css">
+<link rel="stylesheet" href="/css/responsive.css">
+</head>
+<body>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="newspaper" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 18h-5" />
+      <path d="M18 14h-8" />
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-4 0v-9a2 2 0 0 1 2-2h2" />
+      <rect width="8" height="4" x="10" y="6" rx="1" />
+    </symbol>
+    <symbol id="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+      <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+      <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+      <path d="m2 2 20 20" />
+    </symbol>
+    <symbol id="scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v18" />
+      <path d="m19 8 3 8a5 5 0 0 1-6 0zV7" />
+      <path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1" />
+      <path d="m5 8 3 8a5 5 0 0 1-6 0zV7" />
+      <path d="M7 21h10" />
+    </symbol>
+    <symbol id="bookmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z" />
+    </symbol>
+    <symbol id="landmark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 18v-7" />
+      <path d="M11.119 2.205a2 2 0 0 1 1.762 0l7.84 3.846A.5.5 0 0 1 20.5 7h-17a.5.5 0 0 1-.22-.949z" />
+      <path d="M14 18v-7" />
+      <path d="M18 18v-7" />
+      <path d="M3 22h18" />
+      <path d="M6 18v-7" />
+    </symbol>
+    <symbol id="funnel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z" />
+    </symbol>
+    <symbol id="rotate-ccw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+    </symbol>
+    <symbol id="trash-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </symbol>
+    <symbol id="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6 9 17l-5-5" />
+    </symbol>
+  </defs>
+</svg>
+
+<header>
+  <div class="brand">
+    <img class="brand-logo" src="/logo/icon-192.png" alt="NewsPop">
+    <h1>NewsPop</h1>
+    <p class="tagline">Sorry to burst your bubble</p>
+  </div>
+  <nav id="tabs">
+    <button data-tab="feed" class="active"><svg class="ic" aria-hidden="true"><use href="#newspaper"/></svg><span class="tab-label">Feed</span></button>
+    <button data-tab="blindspots"><svg class="ic" aria-hidden="true"><use href="#eye-off"/></svg><span class="tab-label">Blindspot</span></button>
+    <button data-tab="mybias"><svg class="ic" aria-hidden="true"><use href="#scale"/></svg><span class="tab-label">My Bias</span></button>
+    <button data-tab="saved"><svg class="ic" aria-hidden="true"><use href="#bookmark"/></svg><span class="tab-label">Saved</span></button>
+    <button data-tab="sources"><svg class="ic" aria-hidden="true"><use href="#landmark"/></svg><span class="tab-label">Sources</span></button>
+  </nav>
+  <button id="mobile-filters" aria-label="Filters" title="Filters"><svg class="ic" aria-hidden="true"><use href="#funnel"/></svg></button>
+</header>
+
+<button id="filter-backdrop" aria-label="Close filters"></button>
+
+<div id="layout">
+  <aside id="sidebar">
+    <div class="side-top">
+      <button id="collapse-sidebar" title="Hide filters" aria-label="Toggle filters"><svg class="ic" aria-hidden="true"><use href="#funnel"/></svg></button>
+      <span id="brand-version" class="brand-version"></span>
+    </div>
+    <div class="side-body">
+<section>
+      <div class="sec-head"><h3>Search</h3><button class="reset-btn" id="reset-search" title="Clear search"><svg class="ic" aria-hidden="true"><use href="#rotate-ccw"/></svg></button></div>
+      <input id="search" type="search" placeholder="Keyword..." autocomplete="off">
+    </section>
+    <section>
+      <div class="sec-head"><h3>Exclude</h3><button class="reset-btn" id="reset-exclude" title="Clear exclusions"><svg class="ic" aria-hidden="true"><use href="#rotate-ccw"/></svg></button></div>
+      <input id="exclude-input" type="text" placeholder="Keyword..." autocomplete="off">
+      <div class="chips" id="exclude-chips"></div>
+    </section>
+    <section>
+      <div class="sec-head"><h3>Bias</h3></div>
+      <div class="chips" id="bias-chips">
+        <button class="chip on" data-bias="left">Left</button>
+        <button class="chip on" data-bias="center">Center</button>
+        <button class="chip on" data-bias="right">Right</button>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><h3>Time</h3></div>
+      <div class="chips" id="time-chips">
+        <button class="chip time on" data-hours="24">24h</button>
+        <button class="chip time" data-hours="48">48h</button>
+        <button class="chip time" data-hours="168">Week</button>
+        <button class="chip time" data-hours="">All</button>
+      </div>
+    </section>
+    <section>
+      <div class="sec-head"><h3>Sort</h3></div>
+      <div class="chips" id="sort-chips">
+        <button class="chip sort on" data-sort="newest">Newest</button>
+        <button class="chip sort" data-sort="coverage" title="Most outlets covered">Covered</button>
+        <button class="chip sort" data-sort="lopsided" title="Most lopsided coverage">Lopsided</button>
+      </div>
+      <button class="chip" id="unread-toggle">Unread</button>
+    </section>
+    <section>
+      <div class="sec-head"><h3>Countries</h3><div class="sec-actions"><button class="reset-btn bulk-btn" data-bulk="geo" data-mode="on" title="Show all countries"><svg class="ic" aria-hidden="true"><use href="#check"/></svg>All</button><button class="reset-btn bulk-btn" data-bulk="geo" data-mode="none" title="Hide all countries"><svg class="ic" aria-hidden="true"><use href="#trash-2"/></svg>None</button></div></div>
+      <div class="chips" id="geo-chips"></div>
+    </section>
+    <section>
+      <div class="sec-head"><h3>Topics</h3><div class="sec-actions"><button class="reset-btn bulk-btn" data-bulk="topic" data-mode="on" title="Show all topics"><svg class="ic" aria-hidden="true"><use href="#check"/></svg>All</button><button class="reset-btn bulk-btn" data-bulk="topic" data-mode="none" title="Hide all topics"><svg class="ic" aria-hidden="true"><use href="#trash-2"/></svg>None</button></div></div>
+      <div class="chips" id="topic-chips"></div>
+    </section>
+    </div>
+  </aside>
+
+  <main id="content">
+    <div class="empty">Loading...</div>
+  </main>
+</div>
+
+<script src="/js/state.js"></script>
+<script src="/js/util.js"></script>
+<script src="/js/render.js"></script>
+<script src="/js/views.js"></script>
+<script src="/js/interactions.js"></script>
+<script src="/js/init.js"></script>
+
+</body>
+</html>
